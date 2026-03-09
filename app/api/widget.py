@@ -183,6 +183,64 @@ async def _process_install_payload(params: dict, form: dict) -> None:
         logger.info("placement.bind CRM_DEAL_DETAIL_TOOLBAR: %s", data)
 
 
+def _is_runtime_placement(form: dict, params: dict) -> bool:
+    """
+    Определить, что /install открыт не для установки, а как рабочий placement.
+    """
+    placement = _pick(
+        form.get("PLACEMENT"),
+        params.get("PLACEMENT"),
+    )
+    status = _pick(form.get("status"), params.get("status"))
+    event = _pick(form.get("event"), params.get("event"))
+
+    if event and event.upper() == "ONAPPINSTALL":
+        return False
+    if status and status.upper() == "L":
+        return True
+    if placement and placement.upper() != "DEFAULT":
+        return True
+    return False
+
+
+def _build_widget_redirect_target(request: Request, params: dict, form: dict) -> str:
+    deal_id = _pick(
+        params.get("DEAL_ID"),
+        form.get("DEAL_ID"),
+        form.get("deal_id"),
+        form.get("ID"),
+        form.get("ENTITY_ID"),
+        form.get("ENTITY_VALUE_ID"),
+    )
+    domain = _normalize_domain(_pick(
+        params.get("DOMAIN"),
+        params.get("domain"),
+        form.get("DOMAIN"),
+        form.get("domain"),
+        form.get("auth[domain]"),
+        params.get("auth[domain]"),
+    ))
+    placement_options = _pick(
+        form.get("PLACEMENT_OPTIONS"),
+        params.get("PLACEMENT_OPTIONS"),
+        form.get("placement_options"),
+        params.get("placement_options"),
+    )
+
+    qs = {}
+    if deal_id:
+        qs["DEAL_ID"] = deal_id
+    if domain:
+        qs["DOMAIN"] = domain
+    if placement_options:
+        qs["PLACEMENT_OPTIONS"] = placement_options
+
+    target = str(request.url_for("serve_widget_get"))
+    if qs:
+        target = f"{target}?{urlencode(qs)}"
+    return target
+
+
 @router.get("/bitrix/widget", response_class=FileResponse, include_in_schema=False)
 async def serve_widget_get(request: Request):
     """GET — Б24 открывает iframe."""
@@ -248,6 +306,11 @@ async def install_get(request: Request):
     Некоторые порталы Б24 передают auth-параметры именно в query-string на GET.
     """
     params = dict(request.query_params)
+    if _is_runtime_placement({}, params):
+        target = _build_widget_redirect_target(request, params, {})
+        logger.info("install GET opened as placement runtime, redirect -> %s", target)
+        return RedirectResponse(url=target, status_code=303)
+
     if params:
         logger.info("install GET query_params: %s", params)
         try:
@@ -269,6 +332,11 @@ async def install_post(request: Request):
     logger.info("install POST form body: %s", {
         k: v for k, v in form.items() if "ID" not in k
     })
+
+    if _is_runtime_placement(form, params):
+        target = _build_widget_redirect_target(request, params, form)
+        logger.info("install POST opened as placement runtime, redirect -> %s", target)
+        return RedirectResponse(url=target, status_code=303)
 
     try:
         await _process_install_payload(params, form)
