@@ -26,7 +26,7 @@ import logging
 import os
 import re
 from datetime import datetime, timedelta, timezone
-from typing import Annotated, Any
+from typing import Annotated, Any, Literal
 
 from fastapi import APIRouter, Depends, HTTPException, status
 from fastapi.security import OAuth2PasswordBearer, OAuth2PasswordRequestForm
@@ -106,8 +106,11 @@ class TemplateIn(BaseModel):
     doczilla_link: str
     doczilla_folder_id: str = "00000000-0000-0000-0000-000000000000"
     doc_name_template: str = "Документ {deal_id}"
+    bitrix_result_mode: Literal["link", "pdf", "both"] = "both"
     bitrix_deal_link_field: str = settings.BITRIX_DEAL_LINK_FIELD
+    bitrix_deal_link_multiple: bool = False
     bitrix_deal_pdf_field: str = ""
+    bitrix_deal_pdf_multiple: bool = False
     active: bool = True
 
 
@@ -270,8 +273,11 @@ async def import_doczilla_templates(
                 doczilla_link=link,
                 doczilla_folder_id=folder_id,
                 doc_name_template="Документ {deal_id} от {date}",
+                bitrix_result_mode="both",
                 bitrix_deal_link_field=settings.BITRIX_DEAL_LINK_FIELD,
+                bitrix_deal_link_multiple=False,
                 bitrix_deal_pdf_field="",
+                bitrix_deal_pdf_multiple=False,
                 active=body.active,
             )
             if created_tpl and body.sync_structure:
@@ -451,26 +457,32 @@ async def get_bitrix_fields(
     errors: list[str] = []
     try:
         # Названия кастомных UF_* полей берём из userfield.list
+        deal_uf_meta: dict[str, dict[str, Any]] = {}
+        contact_uf_meta: dict[str, dict[str, Any]] = {}
+        company_uf_meta: dict[str, dict[str, Any]] = {}
         deal_uf_labels: dict[str, str] = {}
         contact_uf_labels: dict[str, str] = {}
         company_uf_labels: dict[str, str] = {}
         try:
             deal_uf_rows = await _call_bitrix_list_all(client, "crm.deal.userfield.list")
-            deal_uf_labels = _build_userfield_label_map(deal_uf_rows)
+            deal_uf_meta = _build_userfield_meta_map(deal_uf_rows)
+            deal_uf_labels = {code: str(meta.get("label") or code) for code, meta in deal_uf_meta.items()}
             uf_label_stats["deal"] = len(deal_uf_labels)
         except Exception as e:
             log.warning("crm.deal.userfield.list: %s", e)
             errors.append(f"deal.userfield: {e}")
         try:
             contact_uf_rows = await _call_bitrix_list_all(client, "crm.contact.userfield.list")
-            contact_uf_labels = _build_userfield_label_map(contact_uf_rows)
+            contact_uf_meta = _build_userfield_meta_map(contact_uf_rows)
+            contact_uf_labels = {code: str(meta.get("label") or code) for code, meta in contact_uf_meta.items()}
             uf_label_stats["contact"] = len(contact_uf_labels)
         except Exception as e:
             log.warning("crm.contact.userfield.list: %s", e)
             errors.append(f"contact.userfield: {e}")
         try:
             company_uf_rows = await _call_bitrix_list_all(client, "crm.company.userfield.list")
-            company_uf_labels = _build_userfield_label_map(company_uf_rows)
+            company_uf_meta = _build_userfield_meta_map(company_uf_rows)
+            company_uf_labels = {code: str(meta.get("label") or code) for code, meta in company_uf_meta.items()}
             uf_label_stats["company"] = len(company_uf_labels)
         except Exception as e:
             log.warning("crm.company.userfield.list: %s", e)
@@ -485,13 +497,28 @@ async def get_bitrix_fields(
             errors=errors,
         )
         for fname, finfo in deal_fields.items():
-            title = str(finfo.get("title", fname))
-            if str(fname).upper().startswith("UF_"):
-                title = deal_uf_labels.get(str(fname), title)
+            code = str(fname)
+            norm_code = _normalize_uf_code(code)
+            is_custom = _is_uf_field_code(code)
+            uf_meta = deal_uf_meta.get(norm_code, {})
+            title = _extract_field_title(finfo, code)
+            if is_custom:
+                title = _resolve_userfield_title(code, finfo, deal_uf_labels)
+            field_type = _extract_field_type(finfo)
+            user_type_id = _normalize_user_type_id(uf_meta.get("user_type_id")) or _extract_field_user_type_id(finfo)
+            is_multiple = bool(uf_meta.get("is_multiple")) or _extract_field_is_multiple(finfo)
+            can_store_link, can_store_pdf = _detect_result_storage_capabilities(field_type, user_type_id)
             fields.append({
-                "path": f"deal.{fname}",
+                "path": f"deal.{code}",
+                "entity": "deal",
+                "code": code,
                 "label": f"Сделка: {title}",
-                "type": finfo.get("type", ""),
+                "type": field_type,
+                "user_type_id": user_type_id,
+                "is_custom": is_custom,
+                "is_multiple": is_multiple,
+                "can_store_link": can_store_link,
+                "can_store_pdf": can_store_pdf,
             })
         stats["deal"] = len(deal_fields)
         custom_stats["deal"] = len([k for k in deal_fields.keys() if str(k).upper().startswith("UF_")])
@@ -505,13 +532,28 @@ async def get_bitrix_fields(
             errors=errors,
         )
         for fname, finfo in contact_fields.items():
-            title = str(finfo.get("title", fname))
-            if str(fname).upper().startswith("UF_"):
-                title = contact_uf_labels.get(str(fname), title)
+            code = str(fname)
+            norm_code = _normalize_uf_code(code)
+            is_custom = _is_uf_field_code(code)
+            uf_meta = contact_uf_meta.get(norm_code, {})
+            title = _extract_field_title(finfo, code)
+            if is_custom:
+                title = _resolve_userfield_title(code, finfo, contact_uf_labels)
+            field_type = _extract_field_type(finfo)
+            user_type_id = _normalize_user_type_id(uf_meta.get("user_type_id")) or _extract_field_user_type_id(finfo)
+            is_multiple = bool(uf_meta.get("is_multiple")) or _extract_field_is_multiple(finfo)
+            can_store_link, can_store_pdf = _detect_result_storage_capabilities(field_type, user_type_id)
             fields.append({
-                "path": f"contact.{fname}",
+                "path": f"contact.{code}",
+                "entity": "contact",
+                "code": code,
                 "label": f"Контакт: {title}",
-                "type": finfo.get("type", ""),
+                "type": field_type,
+                "user_type_id": user_type_id,
+                "is_custom": is_custom,
+                "is_multiple": is_multiple,
+                "can_store_link": can_store_link,
+                "can_store_pdf": can_store_pdf,
             })
         stats["contact"] = len(contact_fields)
         custom_stats["contact"] = len([k for k in contact_fields.keys() if str(k).upper().startswith("UF_")])
@@ -525,13 +567,28 @@ async def get_bitrix_fields(
             errors=errors,
         )
         for fname, finfo in company_fields.items():
-            title = str(finfo.get("title", fname))
-            if str(fname).upper().startswith("UF_"):
-                title = company_uf_labels.get(str(fname), title)
+            code = str(fname)
+            norm_code = _normalize_uf_code(code)
+            is_custom = _is_uf_field_code(code)
+            uf_meta = company_uf_meta.get(norm_code, {})
+            title = _extract_field_title(finfo, code)
+            if is_custom:
+                title = _resolve_userfield_title(code, finfo, company_uf_labels)
+            field_type = _extract_field_type(finfo)
+            user_type_id = _normalize_user_type_id(uf_meta.get("user_type_id")) or _extract_field_user_type_id(finfo)
+            is_multiple = bool(uf_meta.get("is_multiple")) or _extract_field_is_multiple(finfo)
+            can_store_link, can_store_pdf = _detect_result_storage_capabilities(field_type, user_type_id)
             fields.append({
-                "path": f"company.{fname}",
+                "path": f"company.{code}",
+                "entity": "company",
+                "code": code,
                 "label": f"Компания: {title}",
-                "type": finfo.get("type", ""),
+                "type": field_type,
+                "user_type_id": user_type_id,
+                "is_custom": is_custom,
+                "is_multiple": is_multiple,
+                "can_store_link": can_store_link,
+                "can_store_pdf": can_store_pdf,
             })
         stats["company"] = len(company_fields)
         custom_stats["company"] = len([k for k in company_fields.keys() if str(k).upper().startswith("UF_")])
@@ -575,8 +632,11 @@ def _template_to_dict(t) -> dict:
         "doczilla_link": t.doczilla_link,
         "doczilla_folder_id": t.doczilla_folder_id,
         "doc_name_template": t.doc_name_template,
+        "bitrix_result_mode": getattr(t, "bitrix_result_mode", "both") or "both",
         "bitrix_deal_link_field": t.bitrix_deal_link_field or "",
+        "bitrix_deal_link_multiple": bool(getattr(t, "bitrix_deal_link_multiple", False)),
         "bitrix_deal_pdf_field": t.bitrix_deal_pdf_field or "",
+        "bitrix_deal_pdf_multiple": bool(getattr(t, "bitrix_deal_pdf_multiple", False)),
         "active": t.active,
         "has_structure": bool(t.structure_json),
         "structure_updated_at": t.structure_updated_at.isoformat() if t.structure_updated_at else None,
@@ -710,6 +770,157 @@ def _extract_localized_label(value: Any) -> str:
     return ""
 
 
+def _pick_row_value(row: dict[str, Any], *keys: str) -> Any:
+    """
+    Достать значение из dict с учётом разных кейсов/стилей ключей:
+    FIELD_NAME / fieldName / field_name.
+    """
+    if not isinstance(row, dict):
+        return None
+
+    for key in keys:
+        value = row.get(key)
+        if value not in (None, ""):
+            return value
+
+    lowered = {str(k).lower(): v for k, v in row.items()}
+    for key in keys:
+        value = lowered.get(str(key).lower())
+        if value not in (None, ""):
+            return value
+    return None
+
+
+def _normalize_uf_code(code: Any) -> str:
+    text = str(code or "").strip()
+    if not text:
+        return ""
+    legacy = _to_legacy_field_code(text)
+    if legacy:
+        return legacy
+    return text.upper()
+
+
+def _is_uf_field_code(code: Any) -> bool:
+    return _normalize_uf_code(code).startswith("UF_")
+
+
+def _is_code_like_title(title: str, code: str) -> bool:
+    t = str(title or "").strip()
+    c = _normalize_uf_code(code)
+    if not t:
+        return True
+    t_norm = _normalize_uf_code(t)
+    if t_norm == c:
+        return True
+    return bool(re.fullmatch(r"UF_[A-Z0-9_]+", t_norm))
+
+
+def _extract_field_title(meta: Any, fallback: str = "") -> str:
+    """
+    Извлечь человекочитаемое имя поля из разных форматов ответа Б24.
+    """
+    if not isinstance(meta, dict):
+        return str(fallback or "").strip()
+
+    for key in (
+        "title",
+        "TITLE",
+        "name",
+        "NAME",
+        "label",
+        "LABEL",
+        "formLabel",
+        "FORM_LABEL",
+        "listLabel",
+        "LIST_LABEL",
+        "EDIT_FORM_LABEL",
+        "editFormLabel",
+        "LIST_COLUMN_LABEL",
+        "listColumnLabel",
+        "LIST_FILTER_LABEL",
+        "listFilterLabel",
+        "caption",
+        "CAPTION",
+    ):
+        value = _pick_row_value(meta, key)
+        label = _extract_localized_label(value)
+        if label:
+            return label
+
+    return str(fallback or "").strip()
+
+
+def _resolve_userfield_title(code: Any, meta: Any, uf_labels: dict[str, str]) -> str:
+    """
+    Найти лучшее название кастомного UF-поля:
+    1) из crm.*.userfield.list
+    2) из метаданных crm.*.fields / crm.item.fields
+    """
+    norm_code = _normalize_uf_code(code)
+    map_label = (
+        uf_labels.get(norm_code)
+        or uf_labels.get(str(code))
+        or uf_labels.get(str(code).upper())
+        or ""
+    )
+    meta_label = _extract_field_title(meta, norm_code)
+
+    if map_label and not _is_code_like_title(map_label, norm_code):
+        return map_label
+    if meta_label and not _is_code_like_title(meta_label, norm_code):
+        return meta_label
+    if map_label:
+        return map_label
+    if meta_label:
+        return meta_label
+    return norm_code
+
+
+def _normalize_user_type_id(value: Any) -> str:
+    return str(value or "").strip().lower().replace("-", "_")
+
+
+def _extract_field_type(meta: Any) -> str:
+    if not isinstance(meta, dict):
+        return ""
+    value = _pick_row_value(meta, "type", "TYPE", "fieldType", "FIELD_TYPE")
+    return str(value or "").strip().lower()
+
+
+def _extract_field_user_type_id(meta: Any) -> str:
+    if not isinstance(meta, dict):
+        return ""
+    value = _pick_row_value(meta, "userType", "USER_TYPE_ID", "userTypeId", "USER_TYPE")
+    return _normalize_user_type_id(value)
+
+
+def _to_bool_flag(value: Any) -> bool:
+    if isinstance(value, bool):
+        return value
+    if isinstance(value, (int, float)):
+        return bool(value)
+    text = str(value or "").strip().upper()
+    return text in {"Y", "YES", "TRUE", "1"}
+
+
+def _extract_field_is_multiple(meta: Any) -> bool:
+    if not isinstance(meta, dict):
+        return False
+    value = _pick_row_value(meta, "isMultiple", "IS_MULTIPLE", "multiple", "MULTIPLE")
+    return _to_bool_flag(value)
+
+
+def _detect_result_storage_capabilities(field_type: str, user_type_id: str) -> tuple[bool, bool]:
+    ft = str(field_type or "").strip().lower()
+    ut = _normalize_user_type_id(user_type_id)
+
+    can_store_pdf = ft in {"file"} or ut in {"file", "disk_file", "document"}
+    can_store_link = ft in {"url"} or ut in {"url", "webaddress", "hyperlink"}
+
+    return can_store_link, can_store_pdf
+
+
 async def _call_bitrix_list_all(client, method: str, params: dict | None = None) -> list[dict]:
     """
     Собрать все страницы list-метода Б24 (result + next).
@@ -824,27 +1035,41 @@ def _to_legacy_field_code(code: Any) -> str:
     return snake.upper()
 
 
-def _build_userfield_label_map(payload: Any) -> dict[str, str]:
+def _build_userfield_meta_map(payload: Any) -> dict[str, dict[str, Any]]:
     """
-    Преобразовать ответ crm.*.userfield.list в map FIELD_NAME -> человекочитаемое имя.
+    Преобразовать ответ crm.*.userfield.list в map FIELD_NAME -> meta.
     """
     if not isinstance(payload, list):
         return {}
-    out: dict[str, str] = {}
+    out: dict[str, dict[str, Any]] = {}
     for row in payload:
         if not isinstance(row, dict):
             continue
-        code = str(row.get("FIELD_NAME") or "").strip()
+        code = str(_pick_row_value(row, "FIELD_NAME", "fieldName", "field_name") or "").strip()
         if not code:
             continue
+        norm_code = _normalize_uf_code(code)
+        user_type_id = _normalize_user_type_id(_pick_row_value(row, "USER_TYPE_ID", "userTypeId", "userType"))
+        is_multiple = _to_bool_flag(_pick_row_value(row, "MULTIPLE", "multiple", "isMultiple", "IS_MULTIPLE"))
         label = (
-            _extract_localized_label(row.get("EDIT_FORM_LABEL"))
-            or _extract_localized_label(row.get("LIST_COLUMN_LABEL"))
-            or _extract_localized_label(row.get("LIST_FILTER_LABEL"))
-            or code
+            _extract_localized_label(_pick_row_value(row, "EDIT_FORM_LABEL", "editFormLabel"))
+            or _extract_localized_label(_pick_row_value(row, "LIST_COLUMN_LABEL", "listColumnLabel"))
+            or _extract_localized_label(_pick_row_value(row, "LIST_FILTER_LABEL", "listFilterLabel"))
+            or _extract_localized_label(_pick_row_value(row, "LABEL", "label", "TITLE", "title", "NAME", "name"))
+            or norm_code
         )
-        out[code] = label
+        out[norm_code] = {
+            "code": norm_code,
+            "label": label,
+            "user_type_id": user_type_id,
+            "is_multiple": is_multiple,
+        }
     return out
+
+
+def _build_userfield_label_map(payload: Any) -> dict[str, str]:
+    meta = _build_userfield_meta_map(payload)
+    return {code: str(item.get("label") or code) for code, item in meta.items()}
 
 
 def _is_mapping_configured(m) -> bool:

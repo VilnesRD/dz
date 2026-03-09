@@ -40,8 +40,11 @@ class Template(Base):
     doczilla_link    = Column(String(64),  nullable=False)           # короткий link
     doczilla_folder_id = Column(String(128), default="00000000-0000-0000-0000-000000000000")
     doc_name_template  = Column(String(256), default="Документ {deal_id}")
+    bitrix_result_mode = Column(String(16), nullable=False, default="both")  # link | pdf | both
     bitrix_deal_link_field = Column(String(128), nullable=False, default="")  # UF_* поле сделки для ссылки
+    bitrix_deal_link_multiple = Column(Boolean, nullable=False, default=False)  # множественное LINK поле
     bitrix_deal_pdf_field  = Column(String(128), nullable=False, default="")  # UF_* (file) поле сделки для PDF
+    bitrix_deal_pdf_multiple = Column(Boolean, nullable=False, default=False)  # множественное FILE поле
     structure_json     = Column(Text, nullable=True)                 # кэш structureRead
     structure_updated_at = Column(DateTime, nullable=True)
     active        = Column(Boolean, default=True)

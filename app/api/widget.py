@@ -20,6 +20,11 @@ logger = logging.getLogger(__name__)
 router = APIRouter()
 STATIC_DIR = Path(__file__).parent.parent / "static"
 settings = get_settings()
+NO_CACHE_HEADERS = {
+    "Cache-Control": "no-store, no-cache, must-revalidate, max-age=0",
+    "Pragma": "no-cache",
+    "Expires": "0",
+}
 
 
 def _pick(*values):
@@ -172,7 +177,7 @@ async def _process_install_payload(params: dict, form: dict) -> None:
             json={
                 "PLACEMENT": "CRM_DEAL_DETAIL_TOOLBAR",
                 "HANDLER": widget_url,
-                "TITLE": "📄 Создать документ",
+                "TITLE": "Создать документ в Doczilla",
                 "DESCRIPTION": "Генерация PDF через Doczilla PRO",
             }
         )
@@ -246,7 +251,12 @@ def _build_widget_redirect_target(request: Request, params: dict, form: dict) ->
 @router.get("/bitrix/widget", response_class=FileResponse, include_in_schema=False)
 async def serve_widget_get(request: Request):
     """GET — Б24 открывает iframe."""
-    return FileResponse(STATIC_DIR / "widget.html", media_type="text/html")
+    return FileResponse(STATIC_DIR / "widget.html", media_type="text/html", headers=NO_CACHE_HEADERS)
+
+
+@router.get("/assets/doczilla-logo.svg", include_in_schema=False)
+async def serve_doczilla_logo():
+    return FileResponse(STATIC_DIR / "doczilla-logo.svg", media_type="image/svg+xml", headers=NO_CACHE_HEADERS)
 
 
 @router.post("/bitrix/widget", response_class=FileResponse, include_in_schema=False)
@@ -320,7 +330,7 @@ async def install_get(request: Request):
             await _process_install_payload(params, {})
         except Exception as e:
             logger.error("Ошибка при установке (GET): %s", e)
-    return FileResponse(STATIC_DIR / "install.html", media_type="text/html")
+    return FileResponse(STATIC_DIR / "install.html", media_type="text/html", headers=NO_CACHE_HEADERS)
 
 
 @router.post("/install", response_class=FileResponse, include_in_schema=False)
@@ -346,4 +356,4 @@ async def install_post(request: Request):
     except Exception as e:
         logger.error("Ошибка при установке (POST): %s", e)
 
-    return FileResponse(STATIC_DIR / "install.html", media_type="text/html")
+    return FileResponse(STATIC_DIR / "install.html", media_type="text/html", headers=NO_CACHE_HEADERS)

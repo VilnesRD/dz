@@ -169,15 +169,18 @@ class BitrixClient:
         })
         return bool(result)
 
-    async def set_deal_doczilla_link(self, deal_id: int | str, link: str) -> bool:
+    async def set_deal_doczilla_link(self, deal_id: int | str, link: str, *, multiple: bool = False) -> bool:
         """Записать ссылку на документ Doczilla в поле сделки."""
-        return await self.update_deal(deal_id, {settings.BITRIX_DEAL_LINK_FIELD: link})
+        value: Any = [link] if multiple else link
+        return await self.update_deal(deal_id, {settings.BITRIX_DEAL_LINK_FIELD: value})
 
-    async def set_deal_field(self, deal_id: int | str, field_code: str, value: Any) -> bool:
+    async def set_deal_field(self, deal_id: int | str, field_code: str, value: Any, *, multiple: bool = False) -> bool:
         """Записать значение в произвольное поле сделки."""
         code = str(field_code or "").strip()
         if not code:
             raise BitrixError("Не указан код поля сделки")
+        if multiple and not isinstance(value, list):
+            value = [value]
         return await self.update_deal(deal_id, {code: value})
 
     async def set_deal_file_field(
@@ -186,6 +189,8 @@ class BitrixClient:
         field_code: str,
         filename: str,
         content: bytes,
+        *,
+        multiple: bool = False,
     ) -> bool:
         """
         Загрузить файл в пользовательское FILE-поле сделки через crm.deal.update.
@@ -194,7 +199,8 @@ class BitrixClient:
         if not code:
             raise BitrixError("Не указан код FILE-поля сделки")
         b64 = base64.b64encode(content).decode()
-        value = {"fileData": [filename, b64]}
+        file_value: dict[str, Any] = {"fileData": [filename, b64]}
+        value: Any = [file_value] if multiple else file_value
         return await self.update_deal(deal_id, {code: value})
 
     # ── CRM: Контакты ─────────────────────────────────────────────────────────

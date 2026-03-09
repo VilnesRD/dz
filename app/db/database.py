@@ -50,8 +50,11 @@ def _migrate_templates_columns():
     добавляем новые колонки в templates, если их ещё нет.
     """
     required = {
+        "bitrix_result_mode": "ALTER TABLE templates ADD COLUMN bitrix_result_mode VARCHAR(16) NOT NULL DEFAULT 'both'",
         "bitrix_deal_link_field": "ALTER TABLE templates ADD COLUMN bitrix_deal_link_field VARCHAR(128) NOT NULL DEFAULT ''",
+        "bitrix_deal_link_multiple": "ALTER TABLE templates ADD COLUMN bitrix_deal_link_multiple BOOLEAN NOT NULL DEFAULT 0",
         "bitrix_deal_pdf_field": "ALTER TABLE templates ADD COLUMN bitrix_deal_pdf_field VARCHAR(128) NOT NULL DEFAULT ''",
+        "bitrix_deal_pdf_multiple": "ALTER TABLE templates ADD COLUMN bitrix_deal_pdf_multiple BOOLEAN NOT NULL DEFAULT 0",
     }
     with engine.begin() as conn:
         rows = conn.exec_driver_sql("PRAGMA table_info(templates)").fetchall()

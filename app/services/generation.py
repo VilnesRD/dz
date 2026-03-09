@@ -122,23 +122,43 @@ class DocumentGenerationService:
             doc_link = f"{base}/workspace#file/{doc_id}"
 
         # ── 6. Записать результат в Б24 ───────────────────────────────────────
+        result_mode = str(getattr(template, "bitrix_result_mode", "") or "both").strip().lower()
+        if result_mode not in {"link", "pdf", "both"}:
+            result_mode = "both"
+        save_link = result_mode in {"link", "both"}
+        save_pdf = result_mode in {"pdf", "both"}
+
         link_field = str(getattr(template, "bitrix_deal_link_field", "") or settings.BITRIX_DEAL_LINK_FIELD or "").strip()
-        if link_field:
+        link_multiple = bool(getattr(template, "bitrix_deal_link_multiple", False))
+        if save_link and link_field:
             try:
-                logger.info("deal=%s: записываем ссылку в Б24 поле %s", deal_id, link_field)
-                await self.bitrix.set_deal_field(deal_id, link_field, doc_link)
+                logger.info(
+                    "deal=%s: записываем ссылку в Б24 поле %s (multiple=%s)",
+                    deal_id, link_field, link_multiple,
+                )
+                await self.bitrix.set_deal_field(deal_id, link_field, doc_link, multiple=link_multiple)
             except Exception as e:
                 warn = f"Не удалось сохранить ссылку в поле {link_field}: {e}"
                 warnings.append(warn)
                 logger.warning("deal=%s: %s", deal_id, warn)
 
         pdf_field = str(getattr(template, "bitrix_deal_pdf_field", "") or "").strip()
-        if pdf_field:
+        pdf_multiple = bool(getattr(template, "bitrix_deal_pdf_multiple", False))
+        if save_pdf and pdf_field:
             try:
-                logger.info("deal=%s: получаем PDF и загружаем в поле %s", deal_id, pdf_field)
+                logger.info(
+                    "deal=%s: получаем PDF и загружаем в поле %s (multiple=%s)",
+                    deal_id, pdf_field, pdf_multiple,
+                )
                 pdf_bytes = await self.doczilla.get_document_pdf(doc_id)
                 filename = _make_pdf_filename(doc_name)
-                await self.bitrix.set_deal_file_field(deal_id, pdf_field, filename, pdf_bytes)
+                await self.bitrix.set_deal_file_field(
+                    deal_id,
+                    pdf_field,
+                    filename,
+                    pdf_bytes,
+                    multiple=pdf_multiple,
+                )
             except Exception as e:
                 warn = f"Не удалось сохранить PDF в поле {pdf_field}: {e}"
                 warnings.append(warn)

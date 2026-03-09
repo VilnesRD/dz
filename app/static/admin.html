@@ -6,7 +6,7 @@
 <title>Doczilla Integration — Админ</title>
 <script defer src="https://cdn.jsdelivr.net/npm/alpinejs@3.14.1/dist/cdn.min.js"></script>
 <style>
-@import url('https://fonts.googleapis.com/css2?family=Manrope:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500&display=swap');
+@import url('https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap');
 *,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
 :root{
   --bg:#f3f4f7;--surface:#ffffff;--surface2:#f7f8fb;--surface3:#f1f3f7;
@@ -14,9 +14,9 @@
   --accent:#ff4d7e;--accent2:#8f67ff;
   --success:#22c55e;--warn:#f59e0b;--danger:#ef4444;
   --text:#2f3440;--muted:#7a8396;--muted2:#9aa2b3;
-  --radius:10px;--font:'Manrope',sans-serif;--mono:'JetBrains Mono',monospace;
+  --radius:10px;--font:'IBM Plex Sans','Segoe UI',system-ui,-apple-system,sans-serif;--mono:'JetBrains Mono',monospace;
 }
-html,body{height:100%;background:var(--bg);color:var(--text);font-family:var(--font);font-size:14px;line-height:1.5}
+html,body{height:100%;background:var(--bg);color:var(--text);font-family:var(--font);font-size:15px;line-height:1.45}
 a{color:var(--accent);text-decoration:none}
 
 /* ── Layout ─────────────────────────────────────────────────────── */
@@ -31,10 +31,10 @@ nav a:hover{color:var(--text);background:var(--surface2)}
 nav a.active{color:var(--accent);border-left-color:var(--accent);background:rgba(255,77,126,.1)}
 .nav-icon{font-size:15px;width:18px;text-align:center}
 .sidebar-foot{margin-top:auto;padding:14px 20px;border-top:1px solid var(--border);font-size:12px;color:var(--muted)}
-.main{flex:1;overflow-y:auto;padding:24px 28px}
+.main{flex:1;overflow-y:auto;overflow-x:hidden;padding:24px 28px}
 
 /* ── Buttons ─────────────────────────────────────────────────────── */
-.btn{display:inline-flex;align-items:center;gap:6px;padding:8px 14px;border:none;border-radius:7px;font-family:var(--font);font-size:13px;font-weight:600;cursor:pointer;transition:.15s;white-space:nowrap}
+.btn{display:inline-flex;align-items:center;gap:6px;padding:8px 14px;border:none;border-radius:7px;font-family:var(--font);font-size:14px;font-weight:600;cursor:pointer;transition:.15s;white-space:nowrap}
 .btn-primary{background:var(--accent);color:#fff}.btn-primary:hover:not(:disabled){background:#ff6b95}
 .btn-danger{background:rgba(239,68,68,.12);color:var(--danger);border:1px solid rgba(239,68,68,.2)}.btn-danger:hover{background:rgba(239,68,68,.22)}
 .btn-ghost{background:var(--surface2);color:var(--text);border:1px solid var(--border)}.btn-ghost:hover{border-color:var(--accent);color:var(--accent)}
@@ -43,11 +43,11 @@ nav a.active{color:var(--accent);border-left-color:var(--accent);background:rgba
 
 /* ── Forms ───────────────────────────────────────────────────────── */
 .field{margin-bottom:14px}
-.field label{display:block;font-size:11px;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:.06em;margin-bottom:6px}
-input,select,textarea{width:100%;background:#fff;border:1px solid var(--border);border-radius:7px;color:var(--text);font-family:var(--font);font-size:13px;padding:9px 12px;transition:.15s}
+.field label{display:block;font-size:12px;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:.06em;margin-bottom:6px}
+input,select,textarea{width:100%;background:#fff;border:1px solid var(--border);border-radius:7px;color:var(--text);font-family:var(--font);font-size:14px;padding:9px 12px;transition:.15s}
 input:focus,select:focus,textarea:focus{outline:none;border-color:var(--accent);background:#fff}
 select{appearance:none;background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='10' height='6'%3E%3Cpath d='M0 0l5 6 5-6z' fill='%236b7a99'/%3E%3C/svg%3E");background-repeat:no-repeat;background-position:right 10px center;padding-right:28px;cursor:pointer}
-select option{background:#1a1f30}
+select option{background:#ffffff;color:var(--text)}
 textarea{resize:vertical;min-height:56px}
 
 /* ── Table ───────────────────────────────────────────────────────── */
@@ -59,11 +59,11 @@ textarea{resize:vertical;min-height:56px}
 
 /* ── Badges ──────────────────────────────────────────────────────── */
 .badge{display:inline-block;padding:2px 7px;border-radius:20px;font-size:11px;font-weight:600}
-.badge-blue{background:rgba(79,124,255,.15);color:#7fa0ff}
-.badge-purple{background:rgba(167,139,250,.15);color:#c4b5fd}
-.badge-green{background:rgba(34,197,94,.15);color:#4ade80}
-.badge-amber{background:rgba(245,158,11,.15);color:#fbbf24}
-.badge-red{background:rgba(239,68,68,.15);color:#f87171}
+.badge-blue{background:rgba(102,147,255,.16);color:#5a82e9}
+.badge-purple{background:rgba(175,130,255,.16);color:#845bd9}
+.badge-green{background:rgba(34,197,94,.13);color:#2cae5a}
+.badge-amber{background:rgba(245,158,11,.14);color:#c88a1d}
+.badge-red{background:rgba(239,68,68,.14);color:#d65252}
 .badge-gray{background:rgba(107,122,153,.12);color:var(--muted)}
 .badge-teal{background:rgba(20,184,166,.15);color:#2dd4bf}
 
@@ -74,7 +74,7 @@ textarea{resize:vertical;min-height:56px}
 .flex-between{display:flex;justify-content:space-between;align-items:center;margin-bottom:16px}
 .empty{text-align:center;padding:44px;color:var(--muted);font-size:13px}
 .mono{font-family:var(--mono);font-size:12px}
-.hint{font-size:11px;color:var(--muted);margin-top:4px;font-family:var(--mono)}
+.hint{font-size:12px;color:var(--muted);margin-top:4px;font-family:var(--mono)}
 .alert{padding:11px 14px;border-radius:7px;font-size:13px;margin-bottom:12px}
 .alert-error{background:rgba(239,68,68,.1);border:1px solid rgba(239,68,68,.2);color:var(--danger)}
 .alert-success{background:rgba(34,197,94,.1);border:1px solid rgba(34,197,94,.2);color:var(--success)}
@@ -84,10 +84,10 @@ textarea{resize:vertical;min-height:56px}
   font-size:16px;line-height:1;padding:0 2px;opacity:.8;flex-shrink:0;
 }
 .alert-close:hover{opacity:1}
-.spinner-sm{width:13px;height:13px;border:2px solid rgba(255,255,255,.25);border-top-color:#fff;border-radius:50%;animation:spin .6s linear infinite;display:inline-block;flex-shrink:0}
+.spinner-sm{width:13px;height:13px;border:2px solid rgba(255,255,255,.35);border-top-color:#fff;border-radius:50%;animation:spin .6s linear infinite;display:inline-block;flex-shrink:0}
 @keyframes spin{to{transform:rotate(360deg)}}
 .modal-bg{position:fixed;inset:0;background:rgba(20,26,38,.35);display:flex;align-items:center;justify-content:center;z-index:200;backdrop-filter:blur(2px)}
-.modal{background:var(--surface);border:1px solid var(--border);border-radius:14px;padding:28px;width:560px;max-height:90vh;overflow-y:auto}
+.modal{background:var(--surface);border:1px solid var(--border);border-radius:14px;padding:28px;width:min(740px,92vw);max-height:90vh;overflow-y:auto}
 .modal-title{font-size:16px;font-weight:700;margin-bottom:20px}
 .login-wrap{display:flex;align-items:center;justify-content:center;height:100vh}
 .login-card{background:var(--surface);border:1px solid var(--border);border-radius:14px;padding:36px;width:360px;box-shadow:0 8px 40px rgba(20,26,38,.15)}
@@ -112,13 +112,13 @@ textarea{resize:vertical;min-height:56px}
   position:sticky;top:0;z-index:20;
   background:var(--surface);border:1px solid var(--border);
   border-radius:var(--radius);padding:10px 14px;margin-bottom:10px;
-  display:flex;gap:10px;align-items:center;
-  box-shadow:0 4px 12px rgba(0,0,0,.3);
+  display:flex;gap:10px;align-items:flex-start;flex-wrap:wrap;
+  box-shadow:0 4px 12px rgba(31,39,55,.08);
 }
 .search-wrap{flex:1 1 200px;min-width:0;position:relative}
 .search-wrap input{padding-left:32px;background:var(--surface2);font-size:13px}
 .search-ico{position:absolute;left:10px;top:50%;transform:translateY(-50%);color:var(--muted);font-size:13px;pointer-events:none}
-.chips{display:flex;gap:5px;flex-wrap:wrap}
+.chips{display:flex;gap:5px;flex-wrap:wrap;flex:1 1 340px}
 .chip{
   display:inline-flex;align-items:center;gap:4px;
   padding:4px 9px;border-radius:20px;font-size:11px;font-weight:600;cursor:pointer;
@@ -126,22 +126,23 @@ textarea{resize:vertical;min-height:56px}
   transition:.15s;white-space:nowrap;
 }
 .chip:hover{border-color:var(--accent);color:var(--text)}
-.chip.on{background:rgba(79,124,255,.15);border-color:rgba(79,124,255,.35);color:var(--accent)}
+.chip.on{background:rgba(255,77,126,.13);border-color:rgba(255,77,126,.28);color:#d93f6c}
 .chip-n{background:var(--border2);border-radius:10px;padding:1px 5px;font-size:10px;color:var(--muted)}
-.chip.on .chip-n{background:rgba(79,124,255,.25);color:var(--accent)}
-.hint-btn{position:relative}
+.chip.on .chip-n{background:rgba(255,77,126,.18);color:#d93f6c}
+.hint-btn{position:relative;margin-left:auto}
 .hint-popup{
   position:absolute;right:0;top:calc(100%+6px);width:320px;
   background:var(--surface);border:1px solid var(--border2);border-radius:10px;
   padding:14px;font-size:12px;color:var(--muted);
-  box-shadow:0 8px 24px rgba(0,0,0,.55);z-index:30;
+  box-shadow:0 8px 24px rgba(20,26,38,.16);z-index:110;
+  max-height:58vh;overflow:auto;
 }
-.hint-popup code{font-family:var(--mono);color:var(--accent);font-size:11px}
+.hint-popup code{font-family:var(--mono);color:var(--accent);font-size:11px;white-space:normal;word-break:break-word;display:block}
 .hint-popup .row{display:flex;flex-direction:column;gap:2px;padding:5px 0;border-bottom:1px solid var(--border)}
 .hint-popup .row:last-child{border-bottom:none}
 
 /* Группы */
-.group{margin-bottom:6px;border-radius:var(--radius);overflow:visible;border:1px solid var(--border)}
+.group{margin-bottom:8px;border-radius:var(--radius);overflow:visible;border:1px solid var(--border);background:#fff}
 .group-head{
   display:flex;align-items:center;gap:8px;
   padding:9px 14px;background:var(--surface2);cursor:pointer;
@@ -152,43 +153,45 @@ textarea{resize:vertical;min-height:56px}
 .grp-arrow.open{transform:rotate(90deg)}
 .grp-name{font-weight:700;font-size:13px;flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 .grp-meta{font-size:11px;color:var(--muted);white-space:nowrap;flex-shrink:0}
-.group-body{border-top:1px solid var(--border);overflow:visible}
+.group-body{border-top:1px solid var(--border);overflow-x:auto;overflow-y:visible;background:#fff}
 
 /* Строка маппинга */
 .mrow{
   display:grid;
-  grid-template-columns:20px minmax(0,1fr) 115px minmax(0,1.4fr) 24px;
+  grid-template-columns:28px minmax(220px,1.1fr) 148px minmax(360px,1.55fr) 28px;
   column-gap:8px;align-items:start;
   padding:9px 14px;border-bottom:1px solid var(--border);
   transition:background .1s;
   position:relative;
   overflow:visible;
+  min-width:820px;
 }
 .mrow:last-child{border-bottom:none}
-.mrow:hover{background:rgba(79,124,255,.025)}
-.mrow.child{background:rgba(0,0,0,.12);padding-left:28px}
+.mrow:hover{background:rgba(255,77,126,.03)}
+.mrow.child{background:#fafbfe;padding-left:28px}
 .mrow.filled .row-n{color:var(--success)}
 .mrow.skipped .row-n{color:var(--muted2)}
 .row-n{font-family:var(--mono);font-size:10px;color:var(--muted2);padding-top:3px;text-align:right}
 .var-name{font-weight:600;font-size:13px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 .var-id{font-family:var(--mono);font-size:10px;color:var(--muted2);margin-top:1px}
 .var-badges{display:flex;gap:3px;flex-wrap:wrap;margin-top:4px}
-.src-sel{font-size:12px!important;padding:6px 26px 6px 8px!important;border-radius:6px!important}
+.src-sel{font-size:13px!important;padding:7px 28px 7px 9px!important;border-radius:6px!important}
 
 /* Input + autocomplete */
-.ac-wrap{position:relative;z-index:40}
-.ac-wrap input{font-size:12px!important;padding:7px 8px!important;border-radius:6px!important}
+.ac-wrap{position:relative;z-index:40;min-width:340px}
+.ac-wrap.open{z-index:160}
+.ac-wrap input{font-size:13px!important;padding:8px 9px!important;border-radius:6px!important}
 .ac-label{font-size:10px;color:var(--success);margin-top:2px;font-family:var(--mono);line-height:1.3;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 .ac-drop{
   position:absolute;top:calc(100%+3px);left:0;right:0;z-index:50;
   background:var(--surface);border:1px solid var(--border2);border-radius:8px;
-  box-shadow:0 8px 28px rgba(20,26,38,.2);max-height:210px;overflow-y:auto;
+  box-shadow:0 8px 28px rgba(20,26,38,.2);max-height:280px;overflow-y:auto;
 }
 .ac-item{padding:7px 10px;cursor:pointer;border-bottom:1px solid var(--border);transition:.1s}
 .ac-item:last-child{border-bottom:none}
 .ac-item:hover,.ac-item.focused{background:var(--surface2)}
-.ac-item-label{font-size:12px;font-weight:500;color:var(--text)}
-.ac-item-path{font-family:var(--mono);font-size:10px;color:var(--muted)}
+.ac-item-label{font-size:13px;font-weight:600;color:var(--text)}
+.ac-item-path{font-family:var(--mono);font-size:11px;color:var(--muted)}
 .ac-item-path em{color:var(--accent);font-style:normal}
 .reset-btn{background:none;border:none;cursor:pointer;color:var(--muted2);font-size:13px;padding:3px;border-radius:4px;transition:.15s;align-self:start;margin-top:3px;line-height:1}
 .reset-btn:hover{color:var(--danger);background:rgba(239,68,68,.1)}
@@ -197,20 +200,91 @@ textarea{resize:vertical;min-height:56px}
 /* Selector map builder */
 .selmap{
   border:1px solid var(--border);
+  border-radius:10px;
+  background:linear-gradient(180deg,#ffffff,#f8f9fd);
+  padding:10px;
+  display:flex;
+  flex-direction:column;
+  gap:10px;
+}
+.selmap-sec{
+  border:1px solid var(--border);
   border-radius:8px;
-  background:var(--surface2);
+  background:#fff;
   padding:8px;
+}
+.selmap-title{
+  font-size:11px;
+  font-weight:700;
+  color:var(--muted);
+  text-transform:uppercase;
+  letter-spacing:.06em;
+  margin-bottom:6px;
 }
 .selmap-row{
   display:flex;
   gap:6px;
-  align-items:center;
-  margin-bottom:6px;
+  align-items:flex-start;
 }
-.selmap-row:last-child{margin-bottom:0}
 .selmap-row .btn{padding:6px 8px;font-size:11px}
-.selmap-row input{padding:6px 8px;font-size:12px}
-.selmap-k{font-size:10px;color:var(--muted);min-width:76px;text-transform:uppercase;letter-spacing:.05em}
+.selmap-row input{padding:7px 8px;font-size:12px}
+.selmap-note{
+  font-size:11px;
+  color:var(--muted);
+  margin-top:4px;
+  line-height:1.35;
+}
+.selmap-rule{
+  display:grid;
+  grid-template-columns:minmax(180px,1fr) minmax(220px,1.1fr) 32px;
+  gap:6px;
+  align-items:start;
+  margin-bottom:8px;
+}
+.selmap-rule:last-child{margin-bottom:0}
+.selmap-targets{
+  width:100%;
+  min-height:76px;
+  max-height:120px;
+  border:1px solid var(--border);
+  border-radius:7px;
+  background:#fff;
+  color:var(--text);
+  font-size:12px;
+  padding:6px;
+}
+.selmap-targets option{padding:2px 4px}
+.selmap-reset{
+  border:none;background:transparent;color:var(--muted2);cursor:pointer;
+  font-size:15px;line-height:1;padding:6px;border-radius:6px;margin-top:2px;
+}
+.selmap-reset:hover{background:rgba(239,68,68,.1);color:var(--danger)}
+.selmap-empty{
+  border:1px dashed var(--border2);
+  border-radius:7px;
+  padding:8px;
+  color:var(--muted);
+  font-size:12px;
+  text-align:center;
+}
+
+@media (max-width: 1200px){
+  .mrow{
+    grid-template-columns:24px minmax(180px,1fr) 136px minmax(300px,1.35fr) 24px;
+    min-width:720px;
+  }
+  .ac-wrap{min-width:300px}
+  .selmap-rule{grid-template-columns:minmax(160px,1fr) minmax(200px,1fr) 30px}
+}
+@media (max-width: 900px){
+  .main{padding:16px}
+  .mapper-toolbar{padding:10px}
+  .chips{flex:1 1 100%}
+  .hint-btn{margin-left:0}
+  .hint-popup{width:min(92vw,420px)}
+  .selmap-rule{grid-template-columns:1fr}
+  .selmap-reset{justify-self:end}
+}
 </style>
 </head>
 <body x-data="app()" x-init="init()">
@@ -333,6 +407,51 @@ textarea{resize:vertical;min-height:56px}
 
         <div x-show="mAlert" class="alert" :class="mAlertT==='error'?'alert-error':'alert-success'" x-text="mAlert"></div>
 
+        <div class="card">
+          <div class="flex-between" style="margin-bottom:10px">
+            <div style="font-size:15px;font-weight:700">Сохранение результата в Битрикс24</div>
+            <button class="btn btn-ghost btn-sm" @click="saveResultSettings()" :disabled="savingResult">
+              <span x-show="savingResult" class="spinner-sm"></span>Сохранить настройки
+            </button>
+          </div>
+          <div class="field" style="max-width:320px">
+            <label>Режим сохранения</label>
+            <select x-model="editTmpl.bitrix_result_mode">
+              <option value="link">Ссылка</option>
+              <option value="pdf">PDF</option>
+              <option value="both">Ссылка и PDF</option>
+            </select>
+          </div>
+          <div class="field" x-show="editTmpl.bitrix_result_mode==='link' || editTmpl.bitrix_result_mode==='both'">
+            <label>Поле сделки для ссылки</label>
+            <select x-model="editTmpl.bitrix_deal_link_field" @change="syncResultFieldMeta(editTmpl,'link')">
+              <option value="">— выберите поле —</option>
+              <option
+                x-show="editTmpl.bitrix_deal_link_field && !hasDealLinkField(editTmpl.bitrix_deal_link_field)"
+                :value="editTmpl.bitrix_deal_link_field"
+                x-text="dealFieldOptionLabel(editTmpl.bitrix_deal_link_field)"
+              ></option>
+              <template x-for="f in dealLinkResultFields" :key="'m-lf-'+f.code">
+                <option :value="f.code" x-text="f.label + (f.is_multiple ? ' (множественное)' : '')"></option>
+              </template>
+            </select>
+          </div>
+          <div class="field" x-show="editTmpl.bitrix_result_mode==='pdf' || editTmpl.bitrix_result_mode==='both'">
+            <label>Поле сделки для PDF</label>
+            <select x-model="editTmpl.bitrix_deal_pdf_field" @change="syncResultFieldMeta(editTmpl,'pdf')">
+              <option value="">— выберите поле —</option>
+              <option
+                x-show="editTmpl.bitrix_deal_pdf_field && !hasDealPdfField(editTmpl.bitrix_deal_pdf_field)"
+                :value="editTmpl.bitrix_deal_pdf_field"
+                x-text="dealFieldOptionLabel(editTmpl.bitrix_deal_pdf_field)"
+              ></option>
+              <template x-for="f in dealPdfResultFields" :key="'m-pf-'+f.code">
+                <option :value="f.code" x-text="f.label + (f.is_multiple ? ' (множественное)' : '')"></option>
+              </template>
+            </select>
+          </div>
+        </div>
+
         <div x-show="mappings.length===0" class="empty card">
           Нажмите «Обновить» — система загрузит все переменные из Doczilla.
         </div>
@@ -446,32 +565,72 @@ textarea{resize:vertical;min-height:56px}
                     <div>
                       <template x-if="g.self.source_type==='selector_map'">
                         <div class="selmap" x-init="ensureSelMap(g.self)">
-                          <div class="selmap-row">
-                            <span class="selmap-k">Источник</span>
-                            <input type="text" x-model="ensureSelMap(g.self).source_field" @input="syncSelMap(g.self)" placeholder="deal.UF_CRM_LIST или doc.103">
-                          </div>
-                          <template x-for="(r,ri) in ensureSelMap(g.self).rules" :key="'gsr'+ri">
+                          <div class="selmap-sec">
+                            <div class="selmap-title">Источник значения</div>
                             <div class="selmap-row">
-                              <input type="text" x-model="r.value" @input="syncSelMap(g.self)" placeholder="Значение из Б24 (* = любое)">
-                              <input type="text" x-model="r.targets" @input="syncSelMap(g.self)" placeholder="ID condition: 201,202">
-                              <button class="btn btn-ghost btn-sm" type="button" @click="delSelRule(g.self,ri)">✕</button>
+                              <input type="text"
+                                x-model="ensureSelMap(g.self).source_field"
+                                @input="syncSelMap(g.self)"
+                                :list="'sel-source-list-'+g.self.variable_id"
+                                placeholder="Выберите поле Б24 или doc.<id>">
                             </div>
-                          </template>
-                          <div class="selmap-row">
-                            <button class="btn btn-ghost btn-sm" type="button" @click="addSelRule(g.self)">+ Правило</button>
+                            <datalist :id="'sel-source-list-'+g.self.variable_id">
+                              <template x-for="s in selectorSourceSuggestions(g.self)" :key="'src-'+g.self.variable_id+'-'+s">
+                                <option :value="s"></option>
+                              </template>
+                            </datalist>
+                            <div class="selmap-note" x-show="fLabel(ensureSelMap(g.self).source_field)" x-text="fLabel(ensureSelMap(g.self).source_field)"></div>
+                            <div class="selmap-note">Примеры: <code>deal.UF_CRM_STAGE</code>, <code>doc.103</code></div>
                           </div>
-                          <div class="selmap-row">
-                            <span class="selmap-k">if filled</span>
-                            <input type="text" x-model="ensureSelMap(g.self).on_not_empty" @input="syncSelMap(g.self)" placeholder="ID condition при непустом значении">
+
+                          <div class="selmap-sec">
+                            <div class="selmap-title">Правила соответствия</div>
+                            <div class="selmap-note" style="margin-bottom:6px">Справа выберите одно или несколько condition-состояний.</div>
+                            <template x-if="!selectorConditionOptions(g.self).length">
+                              <div class="selmap-empty">Нет condition-переменных для выбора.</div>
+                            </template>
+                            <template x-for="(r,ri) in ensureSelMap(g.self).rules" :key="r.rid || ('gsr'+ri)">
+                              <div class="selmap-rule">
+                                <input type="text" x-model="r.value" @input="syncSelMap(g.self)" placeholder="Значение из Б24 (* = любое)">
+                                <select multiple class="selmap-targets" x-model="r.targets" @change="syncSelMap(g.self)">
+                                  <template x-for="o in selectorConditionOptions(g.self)" :key="'go-'+g.self.variable_id+'-'+o.id">
+                                    <option :value="o.id" x-text="o.label"></option>
+                                  </template>
+                                </select>
+                                <button class="selmap-reset" type="button" @click="delSelRule(g.self,ri)" title="Удалить правило">✕</button>
+                                <div class="selmap-note" style="grid-column:1 / span 2" x-text="'Если значение = '+(r.value||'—')+', активируем: '+selTargetsSummary(g.self,r.targets)"></div>
+                              </div>
+                            </template>
+                            <div class="selmap-row">
+                              <button class="btn btn-ghost btn-sm" type="button" @click="addSelRule(g.self)">+ Добавить правило</button>
+                            </div>
                           </div>
-                          <div class="selmap-row">
-                            <span class="selmap-k">if empty</span>
-                            <input type="text" x-model="ensureSelMap(g.self).on_empty" @input="syncSelMap(g.self)" placeholder="ID condition при пустом значении">
+
+                          <div class="selmap-sec">
+                            <div class="selmap-title">Дополнительные действия</div>
+                            <div class="selmap-row">
+                              <div style="flex:1">
+                                <div class="selmap-note" style="margin-bottom:4px">Если источник заполнен</div>
+                                <select multiple class="selmap-targets" x-model="ensureSelMap(g.self).on_not_empty" @change="syncSelMap(g.self)">
+                                  <template x-for="o in selectorConditionOptions(g.self)" :key="'gno-'+g.self.variable_id+'-'+o.id">
+                                    <option :value="o.id" x-text="o.label"></option>
+                                  </template>
+                                </select>
+                              </div>
+                              <div style="flex:1">
+                                <div class="selmap-note" style="margin-bottom:4px">Если источник пустой</div>
+                                <select multiple class="selmap-targets" x-model="ensureSelMap(g.self).on_empty" @change="syncSelMap(g.self)">
+                                  <template x-for="o in selectorConditionOptions(g.self)" :key="'geo-'+g.self.variable_id+'-'+o.id">
+                                    <option :value="o.id" x-text="o.label"></option>
+                                  </template>
+                                </select>
+                              </div>
+                            </div>
                           </div>
                         </div>
                       </template>
                       <template x-if="g.self.source_type!=='selector_map' && g.self.source_type!=='skip'">
-                        <div class="ac-wrap">
+                        <div class="ac-wrap" :class="{open:acTarget===g.self.variable_id}">
                           <input type="text" x-model="g.self.source_value"
                             :placeholder="srcPh(g.self.source_type)"
                             @focus="acOpen(g.self)" @input="acOpen(g.self)"
@@ -519,32 +678,72 @@ textarea{resize:vertical;min-height:56px}
                     <div>
                       <template x-if="m.source_type==='selector_map'">
                         <div class="selmap" x-init="ensureSelMap(m)">
-                          <div class="selmap-row">
-                            <span class="selmap-k">Источник</span>
-                            <input type="text" x-model="ensureSelMap(m).source_field" @input="syncSelMap(m)" placeholder="deal.UF_CRM_LIST или doc.103">
-                          </div>
-                          <template x-for="(r,ri) in ensureSelMap(m).rules" :key="'sr'+ri">
+                          <div class="selmap-sec">
+                            <div class="selmap-title">Источник значения</div>
                             <div class="selmap-row">
-                              <input type="text" x-model="r.value" @input="syncSelMap(m)" placeholder="Значение из Б24 (* = любое)">
-                              <input type="text" x-model="r.targets" @input="syncSelMap(m)" placeholder="ID condition: 201,202">
-                              <button class="btn btn-ghost btn-sm" type="button" @click="delSelRule(m,ri)">✕</button>
+                              <input type="text"
+                                x-model="ensureSelMap(m).source_field"
+                                @input="syncSelMap(m)"
+                                :list="'sel-source-list-'+m.variable_id"
+                                placeholder="Выберите поле Б24 или doc.<id>">
                             </div>
-                          </template>
-                          <div class="selmap-row">
-                            <button class="btn btn-ghost btn-sm" type="button" @click="addSelRule(m)">+ Правило</button>
+                            <datalist :id="'sel-source-list-'+m.variable_id">
+                              <template x-for="s in selectorSourceSuggestions(m)" :key="'src-'+m.variable_id+'-'+s">
+                                <option :value="s"></option>
+                              </template>
+                            </datalist>
+                            <div class="selmap-note" x-show="fLabel(ensureSelMap(m).source_field)" x-text="fLabel(ensureSelMap(m).source_field)"></div>
+                            <div class="selmap-note">Примеры: <code>deal.UF_CRM_STAGE</code>, <code>doc.103</code></div>
                           </div>
-                          <div class="selmap-row">
-                            <span class="selmap-k">if filled</span>
-                            <input type="text" x-model="ensureSelMap(m).on_not_empty" @input="syncSelMap(m)" placeholder="ID condition при непустом значении">
+
+                          <div class="selmap-sec">
+                            <div class="selmap-title">Правила соответствия</div>
+                            <div class="selmap-note" style="margin-bottom:6px">Справа выберите одно или несколько condition-состояний.</div>
+                            <template x-if="!selectorConditionOptions(m).length">
+                              <div class="selmap-empty">Нет condition-переменных для выбора.</div>
+                            </template>
+                            <template x-for="(r,ri) in ensureSelMap(m).rules" :key="r.rid || ('sr'+ri)">
+                              <div class="selmap-rule">
+                                <input type="text" x-model="r.value" @input="syncSelMap(m)" placeholder="Значение из Б24 (* = любое)">
+                                <select multiple class="selmap-targets" x-model="r.targets" @change="syncSelMap(m)">
+                                  <template x-for="o in selectorConditionOptions(m)" :key="'mo-'+m.variable_id+'-'+o.id">
+                                    <option :value="o.id" x-text="o.label"></option>
+                                  </template>
+                                </select>
+                                <button class="selmap-reset" type="button" @click="delSelRule(m,ri)" title="Удалить правило">✕</button>
+                                <div class="selmap-note" style="grid-column:1 / span 2" x-text="'Если значение = '+(r.value||'—')+', активируем: '+selTargetsSummary(m,r.targets)"></div>
+                              </div>
+                            </template>
+                            <div class="selmap-row">
+                              <button class="btn btn-ghost btn-sm" type="button" @click="addSelRule(m)">+ Добавить правило</button>
+                            </div>
                           </div>
-                          <div class="selmap-row">
-                            <span class="selmap-k">if empty</span>
-                            <input type="text" x-model="ensureSelMap(m).on_empty" @input="syncSelMap(m)" placeholder="ID condition при пустом значении">
+
+                          <div class="selmap-sec">
+                            <div class="selmap-title">Дополнительные действия</div>
+                            <div class="selmap-row">
+                              <div style="flex:1">
+                                <div class="selmap-note" style="margin-bottom:4px">Если источник заполнен</div>
+                                <select multiple class="selmap-targets" x-model="ensureSelMap(m).on_not_empty" @change="syncSelMap(m)">
+                                  <template x-for="o in selectorConditionOptions(m)" :key="'mno-'+m.variable_id+'-'+o.id">
+                                    <option :value="o.id" x-text="o.label"></option>
+                                  </template>
+                                </select>
+                              </div>
+                              <div style="flex:1">
+                                <div class="selmap-note" style="margin-bottom:4px">Если источник пустой</div>
+                                <select multiple class="selmap-targets" x-model="ensureSelMap(m).on_empty" @change="syncSelMap(m)">
+                                  <template x-for="o in selectorConditionOptions(m)" :key="'meo-'+m.variable_id+'-'+o.id">
+                                    <option :value="o.id" x-text="o.label"></option>
+                                  </template>
+                                </select>
+                              </div>
+                            </div>
                           </div>
                         </div>
                       </template>
                       <template x-if="m.source_type!=='selector_map' && m.source_type!=='skip'">
-                        <div class="ac-wrap">
+                        <div class="ac-wrap" :class="{open:acTarget===m.variable_id}">
                           <input type="text" x-model="m.source_value"
                             :placeholder="srcPh(m.source_type)"
                             @focus="acOpen(m)" @input="acOpen(m)"
@@ -631,12 +830,50 @@ textarea{resize:vertical;min-height:56px}
     <div class="field"><label>Шаблон имени файла</label>
       <input type="text" x-model="tForm.doc_name_template" placeholder="Договор {deal_id} от {date}">
       <div class="hint">{deal_id}, {company}, {date}</div></div>
-    <div class="field"><label>Поле сделки для ссылки</label>
-      <input type="text" x-model="tForm.bitrix_deal_link_field" placeholder="UF_CRM_DOCZILLA_LINK">
-      <div class="hint">Код пользовательского поля сделки (тип строка/ссылка)</div></div>
-    <div class="field"><label>Поле сделки для PDF (опц.)</label>
-      <input type="text" x-model="tForm.bitrix_deal_pdf_field" placeholder="UF_CRM_DOCZILLA_PDF">
-      <div class="hint">Если указано, PDF будет загружаться в это FILE-поле сделки</div></div>
+    <div class="field"><label>Как сохранять результат в Б24</label>
+      <select x-model="tForm.bitrix_result_mode">
+        <option value="link">Ссылка</option>
+        <option value="pdf">PDF</option>
+        <option value="both">Ссылка и PDF</option>
+      </select>
+    </div>
+    <div x-show="b24Loading" class="hint" style="margin-bottom:10px">Загружаем поля Битрикс24…</div>
+    <div class="field" x-show="tForm.bitrix_result_mode==='link' || tForm.bitrix_result_mode==='both'">
+      <label>Поле сделки для ссылки</label>
+      <select x-model="tForm.bitrix_deal_link_field" @change="syncResultFieldMeta(tForm,'link')">
+        <option value="">— выберите поле —</option>
+        <option
+          x-show="tForm.bitrix_deal_link_field && !hasDealLinkField(tForm.bitrix_deal_link_field)"
+          :value="tForm.bitrix_deal_link_field"
+          x-text="dealFieldOptionLabel(tForm.bitrix_deal_link_field)"
+        ></option>
+        <template x-for="f in dealLinkResultFields" :key="'lf-'+f.code">
+          <option :value="f.code" x-text="f.label + (f.is_multiple ? ' (множественное)' : '')"></option>
+        </template>
+      </select>
+      <div class="hint">Показываются только поля сделки с типом «Ссылка»</div>
+    </div>
+    <div class="field" x-show="tForm.bitrix_result_mode==='pdf' || tForm.bitrix_result_mode==='both'">
+      <label>Поле сделки для PDF</label>
+      <select x-model="tForm.bitrix_deal_pdf_field" @change="syncResultFieldMeta(tForm,'pdf')">
+        <option value="">— выберите поле —</option>
+        <option
+          x-show="tForm.bitrix_deal_pdf_field && !hasDealPdfField(tForm.bitrix_deal_pdf_field)"
+          :value="tForm.bitrix_deal_pdf_field"
+          x-text="dealFieldOptionLabel(tForm.bitrix_deal_pdf_field)"
+        ></option>
+        <template x-for="f in dealPdfResultFields" :key="'pf-'+f.code">
+          <option :value="f.code" x-text="f.label + (f.is_multiple ? ' (множественное)' : '')"></option>
+        </template>
+      </select>
+      <div class="hint">Показываются только FILE-поля сделки</div>
+    </div>
+    <div class="hint" x-show="!b24Loading && (tForm.bitrix_result_mode==='link' || tForm.bitrix_result_mode==='both') && !dealLinkResultFields.length">
+      Не найдены поля типа «Ссылка». Создайте URL-поле в сделке или выберите другой режим.
+    </div>
+    <div class="hint" x-show="!b24Loading && (tForm.bitrix_result_mode==='pdf' || tForm.bitrix_result_mode==='both') && !dealPdfResultFields.length">
+      Не найдены FILE-поля сделки для загрузки PDF.
+    </div>
     <div style="display:flex;gap:8px;justify-content:flex-end;margin-top:8px">
       <button class="btn btn-ghost" @click="showTmplModal=false">Отмена</button>
       <button class="btn btn-primary" @click="saveT()" :disabled="tLoading">
@@ -695,7 +932,7 @@ function app() { return {
 
   // mapper
   editTmpl:null, mappings:[],
-  loadingStruct:false, saving:false,
+  loadingStruct:false, saving:false, savingResult:false,
   mAlert:'', mAlertT:'success',
   mSearch:'', mFilt:'all',
   collapsed: new Set(),
@@ -704,6 +941,7 @@ function app() { return {
 
   // autocomplete
   acTarget:null, acRes:[], acIdx:-1, _acQ:'',
+  _selRuleUid:1,
 
   // b24 fields
   showB24:false, b24Fields:[], b24LabelMap:{}, b24Loading:false, b24Q:'',
@@ -767,27 +1005,38 @@ function app() { return {
       this.setImpMsg('Ошибка импорта: '+e.message,'error',0);
     }finally{this.impLoading=false;}
   },
-  openNew(){
+  async openNew(){
+    await this.loadB24();
     this.tForm={key:'',name:'',doczilla_file_id:'',doczilla_link:'',
       doczilla_folder_id:'00000000-0000-0000-0000-000000000000',
       doc_name_template:'Документ {deal_id} от {date}',
+      bitrix_result_mode:'both',
       bitrix_deal_link_field:'UF_CRM_DOCZILLA_LINK',
+      bitrix_deal_link_multiple:false,
       bitrix_deal_pdf_field:'',
+      bitrix_deal_pdf_multiple:false,
       active:true};
+    this.applyResultSettingsDefaults(this.tForm);
     this.tErr=''; this.showTmplModal=true;
   },
-  editT(t){
+  async editT(t){
+    await this.loadB24();
     this.tForm={...t};
+    if(!('bitrix_result_mode' in this.tForm)) this.tForm.bitrix_result_mode='both';
     if(!('bitrix_deal_link_field' in this.tForm)) this.tForm.bitrix_deal_link_field='UF_CRM_DOCZILLA_LINK';
+    if(!('bitrix_deal_link_multiple' in this.tForm)) this.tForm.bitrix_deal_link_multiple=false;
     if(!('bitrix_deal_pdf_field' in this.tForm)) this.tForm.bitrix_deal_pdf_field='';
+    if(!('bitrix_deal_pdf_multiple' in this.tForm)) this.tForm.bitrix_deal_pdf_multiple=false;
+    this.applyResultSettingsDefaults(this.tForm);
     this.tErr=''; this.showTmplModal=true;
   },
   async saveT(){
     this.tLoading=true; this.tErr='';
     try{
+      this.applyResultSettingsDefaults(this.tForm);
       const m=this.tForm.id?'PUT':'POST';
       const u=this.tForm.id?`/admin/templates/${this.tForm.id}`:'/admin/templates';
-      await this.req(m,u,this.tForm);
+      await this.req(m,u,this.buildTemplatePayload(this.tForm));
       this.showTmplModal=false; await this.loadTmpls();
     }catch(e){this.tErr=e.message;}finally{this.tLoading=false;}
   },
@@ -799,6 +1048,7 @@ function app() { return {
   // ── mapper ────────────────────────────────────────────────────
   async openMapper(t){
     this.editTmpl=t; this.mAlert=''; this.mSearch=''; this.mFilt='all';
+    this.applyResultSettingsDefaults(this.editTmpl);
     this.collapsed=new Set(); this.acClose();
     const raw=await this.req('GET',`/admin/templates/${t.id}/mappings`);
     raw.forEach((m,i)=>m._n=i+1);
@@ -833,6 +1083,24 @@ function app() { return {
       this.mAlert='Маппинг сохранён ✓'; this.mAlertT='success';
     }catch(e){this.mAlert='Ошибка: '+e.message;this.mAlertT='error';}
     finally{this.saving=false;}
+  },
+
+  async saveResultSettings(){
+    if(!this.editTmpl) return;
+    this.savingResult=true;
+    this.mAlert='';
+    try{
+      this.applyResultSettingsDefaults(this.editTmpl);
+      await this.req('PUT',`/admin/templates/${this.editTmpl.id}`,this.buildTemplatePayload(this.editTmpl));
+      this.mAlert='Настройки сохранения результата обновлены ✓';
+      this.mAlertT='success';
+      await this.loadTmpls();
+    }catch(e){
+      this.mAlert='Ошибка настроек результата: '+e.message;
+      this.mAlertT='error';
+    }finally{
+      this.savingResult=false;
+    }
   },
 
   toggleG(id){
@@ -906,7 +1174,7 @@ function app() { return {
       });
     }
 
-    const icons={selector:'❓',replicator:'🔁',condition:'❔',variable:'📝'};
+    const icons={selector:'◎',replicator:'↺',condition:'?',variable:'T'};
     const groups=[];
 
     this.mappings.forEach(m=>{
@@ -934,6 +1202,62 @@ function app() { return {
   },
 
   // ── Selector map builder ───────────────────────────────────────
+  _newSelRule(value='', targets=[]){
+    this._selRuleUid+=1;
+    return {rid:'sr'+this._selRuleUid,value:String(value||''),targets:this._normalizeIdsArray(targets)};
+  },
+  _normalizeIdsArray(value){
+    if(value===null||value===undefined) return [];
+    const list = Array.isArray(value) ? value : [value];
+    const ids = [];
+    list.forEach(v=>{
+      String(v||'')
+        .split(',')
+        .map(x=>x.trim())
+        .filter(Boolean)
+        .forEach(x=>ids.push(x));
+    });
+    return [...new Set(ids)];
+  },
+  selectorConditionOptions(m){
+    if(!m) return [];
+    const selfId=String(m.variable_id||'').trim();
+    const parentId=String(m.parent_variable_id||'').trim();
+    let pool=this.mappings.filter(x=>String(x.variable_kind)==='condition');
+    if(parentId){
+      const scoped=pool.filter(x=>String(x.parent_variable_id||'').trim()===parentId);
+      if(scoped.length) pool=scoped;
+    }
+    const out=[];
+    const seen=new Set();
+    pool.forEach(c=>{
+      const id=String(c.variable_id||'').trim();
+      if(!id||seen.has(id)) return;
+      seen.add(id);
+      out.push({id,label:`${c.variable_name} (#${id})`});
+    });
+    if(selfId&&!seen.has(selfId)){
+      out.push({id:selfId,label:`${m.variable_name||'Текущий condition'} (#${selfId})`});
+    }
+    return out.sort((a,b)=>a.label.localeCompare(b.label,'ru'));
+  },
+  selectorSourceSuggestions(m){
+    const b24=this.b24Fields
+      .map(f=>String(f?.path||'').trim())
+      .filter(Boolean)
+      .slice(0,300);
+    const doc=this.selectorConditionOptions(m).map(o=>`doc.${o.id}`);
+    return [...new Set([...b24,...doc])];
+  },
+  selTargetsSummary(m,targets){
+    const ids=this._normalizeIdsArray(targets);
+    if(!ids.length) return 'ничего не выбрано';
+    const labelById={};
+    this.selectorConditionOptions(m).forEach(o=>{labelById[o.id]=o.label;});
+    const items=ids.map(id=>labelById[id]||`#${id}`);
+    if(items.length<=2) return items.join(', ');
+    return `${items.slice(0,2).join(', ')} +${items.length-2}`;
+  },
   onSourceTypeChange(m){
     if(m.source_type==='selector_map'){
       this.ensureSelMap(m);
@@ -957,29 +1281,21 @@ function app() { return {
   },
   ensureSelMap(m){
     if(m._selMap) return m._selMap;
-    const cfg={source_field:'',rules:[],on_not_empty:'',on_empty:''};
+    const cfg={source_field:'',rules:[],on_not_empty:[],on_empty:[]};
     try{
       const raw=JSON.parse(m.source_value||'{}');
       cfg.source_field=String(raw.source_field||'').trim();
       if(raw.options&&typeof raw.options==='object'){
         Object.entries(raw.options).forEach(([k,v])=>{
-          const ids=Array.isArray(v)?v.map(x=>String(x).trim()).filter(Boolean):[String(v||'').trim()].filter(Boolean);
-          cfg.rules.push({value:String(k||''),targets:ids.join(',')});
+          cfg.rules.push(this._newSelRule(String(k||''),v));
         });
       }
-      const toText=(v)=>Array.isArray(v)?v.map(x=>String(x).trim()).filter(Boolean).join(','):String(v||'').trim();
-      cfg.on_not_empty=toText(raw.on_not_empty);
-      cfg.on_empty=toText(raw.on_empty);
+      cfg.on_not_empty=this._normalizeIdsArray(raw.on_not_empty);
+      cfg.on_empty=this._normalizeIdsArray(raw.on_empty);
     }catch(_e){}
-    if(!cfg.rules.length) cfg.rules=[{value:'',targets:''}];
+    if(!cfg.rules.length) cfg.rules=[this._newSelRule('',[])];
     m._selMap=cfg;
     return m._selMap;
-  },
-  _parseIdsText(text){
-    return String(text||'')
-      .split(',')
-      .map(x=>x.trim())
-      .filter(Boolean);
   },
   _oneOrMany(ids){
     if(!ids.length) return '';
@@ -990,31 +1306,32 @@ function app() { return {
     const out={source_field:String(cfg.source_field||'').trim(),options:{},this_condition_id:String(m.variable_id)};
     cfg.rules.forEach(r=>{
       const key=String(r.value||'').trim();
-      const ids=this._parseIdsText(r.targets);
+      const ids=this._normalizeIdsArray(r.targets);
       if(!key||!ids.length) return;
       out.options[key]=this._oneOrMany(ids);
     });
-    const onNotEmpty=this._parseIdsText(cfg.on_not_empty);
-    const onEmpty=this._parseIdsText(cfg.on_empty);
+    const onNotEmpty=this._normalizeIdsArray(cfg.on_not_empty);
+    const onEmpty=this._normalizeIdsArray(cfg.on_empty);
     if(onNotEmpty.length) out.on_not_empty=this._oneOrMany(onNotEmpty);
     if(onEmpty.length) out.on_empty=this._oneOrMany(onEmpty);
     m.source_value=JSON.stringify(out);
   },
   addSelRule(m){
     const cfg=this.ensureSelMap(m);
-    cfg.rules.push({value:'',targets:''});
+    cfg.rules.push(this._newSelRule('',[]));
     this.syncSelMap(m);
   },
   delSelRule(m,idx){
     const cfg=this.ensureSelMap(m);
     cfg.rules.splice(idx,1);
-    if(!cfg.rules.length) cfg.rules.push({value:'',targets:''});
+    if(!cfg.rules.length) cfg.rules.push(this._newSelRule('',[]));
     this.syncSelMap(m);
   },
 
   // ── Autocomplete ──────────────────────────────────────────────
   acOpen(m){
     if(m.source_type!=='field'&&m.source_type!=='formula'){this.acClose();return;}
+    this.showHint=false;
     this.acTarget=m.variable_id; this.acIdx=-1;
     this._acQ=m.source_value||'';
     this._calcAc(m.source_value||'');
@@ -1073,7 +1390,80 @@ function app() { return {
     return path.replace(new RegExp('('+q.replace(/[.*+?^${}()|[\]\\]/g,'\\$&')+')','gi'),'<em>$1</em>');
   },
   fLabel(path){
-    return this.b24LabelMap[path]||'';
+    const p=String(path||'');
+    return this.b24LabelMap[p]||this.b24LabelMap[p.toLowerCase()]||'';
+  },
+
+  get dealResultFields(){
+    return this.b24Fields
+      .filter(f=>f && f.entity==='deal')
+      .sort((a,b)=>String(a.label||a.code||'').localeCompare(String(b.label||b.code||''),'ru'));
+  },
+  get dealLinkResultFields(){
+    return this.dealResultFields.filter(f=>f.can_store_link);
+  },
+  get dealPdfResultFields(){
+    return this.dealResultFields.filter(f=>f.can_store_pdf);
+  },
+  dealFieldByCode(code){
+    const c=String(code||'').trim();
+    if(!c) return null;
+    return this.dealResultFields.find(f=>String(f.code)===c) || null;
+  },
+  dealFieldOptionLabel(code){
+    const f=this.dealFieldByCode(code);
+    if(f) return f.label + (f.is_multiple ? ' (множественное)' : '');
+    return `Текущее поле: ${code} (тип не подходит под фильтр)`;
+  },
+  hasDealLinkField(code){
+    const c=String(code||'').trim();
+    if(!c) return false;
+    return this.dealLinkResultFields.some(f=>String(f.code)===c);
+  },
+  hasDealPdfField(code){
+    const c=String(code||'').trim();
+    if(!c) return false;
+    return this.dealPdfResultFields.some(f=>String(f.code)===c);
+  },
+  syncResultFieldMeta(target, kind){
+    if(!target) return;
+    if(kind==='link'){
+      const code=String(target.bitrix_deal_link_field||'').trim();
+      const field=this.dealLinkResultFields.find(f=>String(f.code)===code);
+      target.bitrix_deal_link_multiple=Boolean(field?.is_multiple);
+      return;
+    }
+    if(kind==='pdf'){
+      const code=String(target.bitrix_deal_pdf_field||'').trim();
+      const field=this.dealPdfResultFields.find(f=>String(f.code)===code);
+      target.bitrix_deal_pdf_multiple=Boolean(field?.is_multiple);
+    }
+  },
+  applyResultSettingsDefaults(target){
+    if(!target) return;
+    const mode=String(target.bitrix_result_mode||'').toLowerCase();
+    target.bitrix_result_mode = (mode==='link'||mode==='pdf'||mode==='both') ? mode : 'both';
+    if(typeof target.bitrix_deal_link_multiple!=='boolean') target.bitrix_deal_link_multiple=false;
+    if(typeof target.bitrix_deal_pdf_multiple!=='boolean') target.bitrix_deal_pdf_multiple=false;
+    this.syncResultFieldMeta(target,'link');
+    this.syncResultFieldMeta(target,'pdf');
+  },
+  buildTemplatePayload(source){
+    const s=source||{};
+    return {
+      key: String(s.key||'').trim(),
+      name: String(s.name||'').trim(),
+      doczilla_file_id: String(s.doczilla_file_id||'').trim(),
+      doczilla_link: String(s.doczilla_link||'').trim(),
+      doczilla_folder_id: String(s.doczilla_folder_id||'00000000-0000-0000-0000-000000000000').trim(),
+      doc_name_template: String(s.doc_name_template||'Документ {deal_id}').trim(),
+      bitrix_result_mode: String(s.bitrix_result_mode||'both').trim(),
+      bitrix_deal_link_field: String(s.bitrix_deal_link_field||'').trim(),
+      bitrix_deal_link_multiple: Boolean(s.bitrix_deal_link_multiple),
+      bitrix_deal_pdf_field: String(s.bitrix_deal_pdf_field||'').trim(),
+      bitrix_deal_pdf_multiple: Boolean(s.bitrix_deal_pdf_multiple),
+      active: Boolean(s.active),
+    };
   },
 
   // ── B24 fields ────────────────────────────────────────────────
@@ -1083,7 +1473,13 @@ function app() { return {
       const r=await this.req('GET','/admin/bitrix/fields');
       this.b24Fields=Array.isArray(r.fields)?r.fields:[];
       const map={};
-      this.b24Fields.forEach(f=>{if(f&&f.path) map[f.path]=f.label||'';});
+      this.b24Fields.forEach(f=>{
+        if(!f||!f.path) return;
+        const p=String(f.path);
+        const l=f.label||'';
+        map[p]=l;
+        map[p.toLowerCase()]=l;
+      });
       this.b24LabelMap=map;
       const stats=r?.meta?.stats||{};
       const custom=r?.meta?.custom_stats||{};
