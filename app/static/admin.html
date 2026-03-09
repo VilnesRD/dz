@@ -609,7 +609,7 @@ function app() { return {
 
   // templates
   tmpls:[], showTmplModal:false, tForm:{}, tErr:'', tLoading:false,
-  impLoading:false, impMsg:'', impMsgT:'success', doczSection:localStorage.getItem('docz_section')||'',
+  impLoading:false, impMsg:'', impMsgT:'success', doczSection:'039BC112-E801-4F82-BA21-484F72500736',
 
   // mapper
   editTmpl:null, mappings:[],
@@ -653,21 +653,13 @@ function app() { return {
   // ── templates ─────────────────────────────────────────────────
   async loadTmpls(){this.tmpls=await this.req('GET','/admin/templates');},
   async importFromDoczilla(){
-    const section=(prompt('Section ID раздела Doczilla (НЕ folderId=00000000-...)',this.doczSection||'')||'').trim();
-    if(!section)return;
-    if(section==='00000000-0000-0000-0000-000000000000'){
-      this.impMsg='Ошибка импорта: указан folderId root (0000...). Нужен именно section_id раздела Doczilla.';
-      this.impMsgT='error';
-      return;
-    }
-    this.doczSection=section; localStorage.setItem('docz_section',section);
     this.impLoading=true; this.impMsg='';
     try{
       const r=await this.req('POST','/admin/templates/import-doczilla',{
-        section_id: section,
+        section_id: this.doczSection,
         active:true
       });
-      this.impMsg=`Импорт завершён: создано ${r.created}, обновлено ${r.updated}, пропущено ${r.skipped}`;
+      this.impMsg=`Импорт завершён (section ${r.section_id}): создано ${r.created}, обновлено ${r.updated}, пропущено ${r.skipped}`;
       this.impMsgT='success';
       await this.loadTmpls();
     }catch(e){

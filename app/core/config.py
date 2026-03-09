@@ -11,7 +11,7 @@ class Settings(BaseSettings):
     DOCZILLA_LOGIN: str             # email
     DOCZILLA_PASSWORD: str          # пароль (plain, клиент сам хэширует если нужно)
     DOCZILLA_SESSION_TTL: int = 1800  # секунд (30 минут)
-    DOCZILLA_TEMPLATES_SECTION_ID: str = ""  # раздел с опубликованными dotx
+    DOCZILLA_TEMPLATES_SECTION_ID: str = "039BC112-E801-4F82-BA21-484F72500736"  # раздел с опубликованными dotx
 
     # ── Битрикс24 (локальное OAuth-приложение) ───────────────────────────────
     BITRIX_DEAL_LINK_FIELD: str = "UF_CRM_DOCZILLA_LINK"
