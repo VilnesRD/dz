@@ -42,9 +42,9 @@ async def main():
     client = DoczillaClient()
     try:
         if args.list_templates:
-            section_id = args.section_id or settings.DOCZILLA_SECTION_ID
+            section_id = args.section_id or settings.DOCZILLA_TEMPLATES_SECTION_ID
             if not section_id:
-                print("❌ Укажите --section-id или задайте DOCZILLA_SECTION_ID в .env")
+                print("❌ Укажите --section-id или задайте DOCZILLA_TEMPLATES_SECTION_ID в .env")
                 return
             templates = await client.get_templates(section_id)
             print(f"\n📋 Найдено шаблонов: {len(templates)}\n")

@@ -84,6 +84,7 @@ docker compose up -d --build
 | `DOCZILLA_BASE_URL` | URL Doczilla |
 | `DOCZILLA_LOGIN` | Email |
 | `DOCZILLA_PASSWORD` | Пароль |
+| `DOCZILLA_TEMPLATES_SECTION_ID` | Section ID опубликованных dotx-шаблонов (импорт в `/admin` сканирует корень и 1 уровень вложенных папок) |
 | `APP_PUBLIC_URL` | `https://bridge.vird.cloud` |
 | `BITRIX_CLIENT_ID` | Client ID локального приложения (для refresh_token) |
 | `BITRIX_CLIENT_SECRET` | Client Secret локального приложения (для refresh_token) |

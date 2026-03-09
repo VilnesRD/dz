@@ -240,8 +240,14 @@ textarea{resize:vertical;min-height:56px}
       <div>
         <div class="flex-between">
           <h1 class="page-title" style="margin:0">Шаблоны</h1>
-          <button class="btn btn-primary" @click="openNew()">+ Добавить</button>
+          <div class="flex">
+            <button class="btn btn-ghost" @click="importFromDoczilla()" :disabled="impLoading">
+              <span x-show="impLoading" class="spinner-sm"></span>Импорт из Doczilla
+            </button>
+            <button class="btn btn-primary" @click="openNew()">+ Добавить</button>
+          </div>
         </div>
+        <div x-show="impMsg" class="alert" :class="impMsgT==='error'?'alert-error':'alert-success'" x-text="impMsg"></div>
         <div x-show="tmpls.length===0" class="empty card">Нет шаблонов.</div>
         <div x-show="tmpls.length>0" class="card" style="padding:0;overflow:hidden">
           <table class="tbl">
@@ -601,6 +607,7 @@ function app() { return {
 
   // templates
   tmpls:[], showTmplModal:false, tForm:{}, tErr:'', tLoading:false,
+  impLoading:false, impMsg:'', impMsgT:'success', doczSection:localStorage.getItem('docz_section')||'',
 
   // mapper
   editTmpl:null, mappings:[],
@@ -643,6 +650,24 @@ function app() { return {
 
   // ── templates ─────────────────────────────────────────────────
   async loadTmpls(){this.tmpls=await this.req('GET','/admin/templates');},
+  async importFromDoczilla(){
+    const section=(prompt('Section ID опубликованных шаблонов Doczilla',this.doczSection||'')||'').trim();
+    if(!section)return;
+    this.doczSection=section; localStorage.setItem('docz_section',section);
+    this.impLoading=true; this.impMsg='';
+    try{
+      const r=await this.req('POST','/admin/templates/import-doczilla',{
+        section_id: section,
+        active:true
+      });
+      this.impMsg=`Импорт завершён: создано ${r.created}, обновлено ${r.updated}, пропущено ${r.skipped}`;
+      this.impMsgT='success';
+      await this.loadTmpls();
+    }catch(e){
+      this.impMsg='Ошибка импорта: '+e.message;
+      this.impMsgT='error';
+    }finally{this.impLoading=false;}
+  },
   openNew(){
     this.tForm={key:'',name:'',doczilla_file_id:'',doczilla_link:'',
       doczilla_folder_id:'00000000-0000-0000-0000-000000000000',

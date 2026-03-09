@@ -90,21 +90,129 @@ class DoczillaClient:
 
     # ── 3.1 Файловая система ──────────────────────────────────────────────────
 
-    async def get_templates(self, section_id: str) -> list[dict]:
-        """
-        Получить список опубликованных шаблонов (dotx) из раздела.
-        Метод 3.1.11 из API.
-        """
-        data = await self._request({
+    @staticmethod
+    def _is_folder(item: dict) -> bool:
+        """Нормализовать флаг isFolder из разных форматов (bool/str/int)."""
+        value = item.get("isFolder")
+        if isinstance(value, bool):
+            return value
+        if isinstance(value, (int, float)):
+            return bool(value)
+        if isinstance(value, str):
+            return value.strip().lower() in ("1", "true", "yes", "y")
+        return False
+
+    async def _read_workspace(
+        self,
+        section_id: str,
+        folder_id: str,
+        fields: str,
+        sort: str,
+        filter_expr: str | None = None,
+    ) -> list[dict]:
+        params: dict[str, Any] = {
             "request": "ru.doczilla.workspace.table.Workspace",
             "action": "read",
             "section": section_id,
-            "folderId": "00000000-0000-0000-0000-000000000000",
-            "fields": '["name", "recordId", "link"]',
-            "filter": '[{"property":"type","value":"dotx"}]',
-            "sort": '[{"property":"name","direction":"asc"}]',
-        })
-        return data.get("data", [])
+            "folderId": folder_id,
+            "fields": fields,
+            "sort": sort,
+        }
+        if filter_expr:
+            params["filter"] = filter_expr
+        data = await self._request(params)
+        items = data.get("data", [])
+        return items if isinstance(items, list) else []
+
+    async def get_templates(self, section_id: str) -> list[dict]:
+        """
+        Получить список опубликованных шаблонов (dotx) из раздела,
+        включая один уровень вложенных папок.
+        """
+        root_folder_id = "00000000-0000-0000-0000-000000000000"
+        fields = '["name", "recordId", "link", "isFolder"]'
+        sort = '[{"property":"isFolder","direction":"desc"},{"property":"lastModified","direction":"desc"}]'
+        filter_dotx = '[{"property":"type","value":"dotx"}]'
+
+        # 1) Корневой листинг без фильтра — нужен, чтобы увидеть папки.
+        root_items = await self._read_workspace(
+            section_id=section_id,
+            folder_id=root_folder_id,
+            fields=fields,
+            sort=sort,
+            filter_expr=None,
+        )
+        folders = [x for x in root_items if isinstance(x, dict) and self._is_folder(x)]
+
+        templates: list[dict] = []
+
+        # 2) dotx в корне.
+        root_templates = await self._read_workspace(
+            section_id=section_id,
+            folder_id=root_folder_id,
+            fields=fields,
+            sort=sort,
+            filter_expr=filter_dotx,
+        )
+        for item in root_templates:
+            if not isinstance(item, dict):
+                continue
+            if self._is_folder(item):
+                continue
+            record_id = str(item.get("recordId") or "").strip()
+            link = str(item.get("link") or "").strip()
+            name = str(item.get("name") or "").strip()
+            if not (record_id and link and name):
+                continue
+            templates.append({
+                "name": name,
+                "recordId": record_id,
+                "link": link,
+                "isFolder": False,
+                "folderId": root_folder_id,
+                "folderName": None,
+            })
+
+        # 3) dotx в папках первого уровня.
+        for folder in folders:
+            folder_id = str(folder.get("recordId") or "").strip()
+            folder_name = str(folder.get("name") or "").strip() or None
+            if not folder_id:
+                continue
+
+            child_templates = await self._read_workspace(
+                section_id=section_id,
+                folder_id=folder_id,
+                fields=fields,
+                sort=sort,
+                filter_expr=filter_dotx,
+            )
+            for item in child_templates:
+                if not isinstance(item, dict):
+                    continue
+                if self._is_folder(item):
+                    continue
+                record_id = str(item.get("recordId") or "").strip()
+                link = str(item.get("link") or "").strip()
+                name = str(item.get("name") or "").strip()
+                if not (record_id and link and name):
+                    continue
+                templates.append({
+                    "name": name,
+                    "recordId": record_id,
+                    "link": link,
+                    "isFolder": False,
+                    "folderId": folder_id,
+                    "folderName": folder_name,
+                })
+
+        # 4) Дедупликация по recordId.
+        uniq: dict[str, dict] = {}
+        for item in templates:
+            rid = item["recordId"]
+            if rid not in uniq:
+                uniq[rid] = item
+        return list(uniq.values())
 
     async def get_document_info_by_id(self, file_id: str) -> dict:
         """Получить метаданные документа по его recordId. Метод 3.1.3."""
@@ -216,7 +324,14 @@ class DoczillaClient:
             "type": "data",
             "file": file_id,
         })
-        return data.get("data", {})
+        # Поддержка разных форматов ответа:
+        # 1) {"data": {"scheme": ...}}
+        # 2) {"structure": {"scheme": ...}}
+        if isinstance(data.get("data"), dict) and data["data"]:
+            return data["data"]
+        if isinstance(data.get("structure"), dict) and data["structure"]:
+            return data["structure"]
+        return {}
 
     async def get_template_variables(self, file_id: str) -> dict:
         """

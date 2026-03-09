@@ -7,6 +7,8 @@ REST API для админ-панели.
 
   GET    /admin/templates         — список шаблонов
   POST   /admin/templates         — создать шаблон
+  GET    /admin/doczilla/published-templates — список опубликованных dotx из Doczilla
+  POST   /admin/templates/import-doczilla    — импорт dotx шаблонов из Doczilla
   GET    /admin/templates/{id}    — шаблон + его структура
   PUT    /admin/templates/{id}    — обновить шаблон
   DELETE /admin/templates/{id}    — удалить шаблон
@@ -22,6 +24,7 @@ from __future__ import annotations
 import json
 import logging
 import os
+import re
 from datetime import datetime, timedelta, timezone
 from typing import Annotated, Any
 
@@ -34,9 +37,12 @@ from sqlalchemy.orm import Session
 
 from app.db.database import get_db
 from app.db import repository as repo
+from app.db.models import Template
+from app.core.config import get_settings
 
 log = logging.getLogger(__name__)
 router = APIRouter(prefix="/admin", tags=["admin"])
+settings = get_settings()
 
 # ── JWT / Auth ────────────────────────────────────────────────────────────────
 SECRET_KEY  = os.environ.get("ADMIN_SECRET_KEY", "change-me-in-production-please")
@@ -102,6 +108,12 @@ class TemplateIn(BaseModel):
     active: bool = True
 
 
+class DoczillaImportBody(BaseModel):
+    section_id: str | None = None
+    doczilla_folder_id: str | None = None
+    active: bool = True
+
+
 @router.get("/templates")
 async def list_templates(db: Session = Depends(get_db),
                          _=Depends(current_user)):
@@ -117,6 +129,120 @@ async def create_template(body: TemplateIn,
         raise HTTPException(400, f"Шаблон с ключом '{body.key}' уже существует")
     t = repo.create_template(db, **body.model_dump())
     return _template_to_dict(t)
+
+
+@router.get("/doczilla/published-templates")
+async def list_published_doczilla_templates(
+    section_id: str | None = None,
+    db: Session = Depends(get_db),
+    _=Depends(current_user),
+):
+    """
+    Получить список опубликованных шаблонов dotx из раздела Doczilla.
+    """
+    from app.services.doczilla_client import DoczillaClient
+
+    section = (section_id or settings.DOCZILLA_TEMPLATES_SECTION_ID or "").strip()
+    if not section:
+        raise HTTPException(400, "Не указан section_id (передайте query или DOCZILLA_TEMPLATES_SECTION_ID в .env)")
+
+    client = DoczillaClient()
+    try:
+        items = await client.get_templates(section)
+    finally:
+        await client.close()
+
+    result = []
+    for item in items:
+        record_id = str(item.get("recordId") or "").strip()
+        link = str(item.get("link") or "").strip()
+        name = str(item.get("name") or "").strip()
+        if not (record_id and link and name):
+            continue
+        exists = db.query(Template).filter(Template.doczilla_file_id == record_id).first()
+        result.append({
+            "name": name,
+            "record_id": record_id,
+            "link": link,
+            "folder_id": str(item.get("folderId") or "00000000-0000-0000-0000-000000000000"),
+            "folder_name": item.get("folderName"),
+            "exists": bool(exists),
+            "existing_template_id": exists.id if exists else None,
+            "suggested_key": _unique_key(db, _slugify(name)),
+        })
+    return {"section_id": section, "templates": result, "count": len(result)}
+
+
+@router.post("/templates/import-doczilla")
+async def import_doczilla_templates(
+    body: DoczillaImportBody,
+    db: Session = Depends(get_db),
+    _=Depends(current_user),
+):
+    """
+    Импортировать опубликованные шаблоны Doczilla в локальную таблицу templates.
+    """
+    from app.services.doczilla_client import DoczillaClient
+
+    section = (body.section_id or settings.DOCZILLA_TEMPLATES_SECTION_ID or "").strip()
+    if not section:
+        raise HTTPException(400, "Не указан section_id (body.section_id или DOCZILLA_TEMPLATES_SECTION_ID)")
+
+    client = DoczillaClient()
+    try:
+        items = await client.get_templates(section)
+    finally:
+        await client.close()
+
+    created = 0
+    updated = 0
+    skipped = 0
+
+    for item in items:
+        record_id = str(item.get("recordId") or "").strip()
+        link = str(item.get("link") or "").strip()
+        name = str(item.get("name") or "").strip()
+        if not (record_id and link and name):
+            skipped += 1
+            continue
+
+        existing = db.query(Template).filter(Template.doczilla_file_id == record_id).first()
+        folder_id = (
+            body.doczilla_folder_id
+            or str(item.get("folderId") or "")
+            or "00000000-0000-0000-0000-000000000000"
+        )
+        if existing:
+            repo.update_template(
+                db, existing.id,
+                name=name,
+                doczilla_link=link,
+                doczilla_folder_id=folder_id,
+                active=body.active,
+            )
+            updated += 1
+            continue
+
+        key = _unique_key(db, _slugify(name))
+        repo.create_template(
+            db,
+            key=key,
+            name=name,
+            doczilla_file_id=record_id,
+            doczilla_link=link,
+            doczilla_folder_id=folder_id,
+            doc_name_template="Документ {deal_id} от {date}",
+            active=body.active,
+        )
+        created += 1
+
+    return {
+        "section_id": section,
+        "created": created,
+        "updated": updated,
+        "skipped": skipped,
+        "total": len(items),
+    }
 
 
 @router.get("/templates/{tid}")
@@ -381,3 +507,22 @@ def _flatten_structure(scheme: dict) -> list[dict]:
     _walk(scheme)
     result.sort(key=lambda x: (x.get("parent_id") or 0, x.get("index", 0)))
     return result
+
+
+def _slugify(value: str) -> str:
+    """
+    Базовый slug для key шаблона (латиница/цифры/дефис).
+    """
+    text = value.strip().lower()
+    text = re.sub(r"[^a-z0-9]+", "-", text)
+    text = re.sub(r"-{2,}", "-", text).strip("-")
+    return text or "template"
+
+
+def _unique_key(db: Session, base: str) -> str:
+    key = base
+    i = 2
+    while repo.get_template_by_key(db, key):
+        key = f"{base}-{i}"
+        i += 1
+    return key
