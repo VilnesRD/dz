@@ -10,7 +10,7 @@
 app/
   api/
     admin_api.py       # REST API: шаблоны, маппинги, логи, JWT-авторизация
-    widget.py          # /bitrix/widget, /api/widget-config, /install
+    widget.py          # /bitrix/widget, /bitrix/lead-userfield, /api/widget-config, /install
   core/
     config.py          # Pydantic Settings (.env)
     session.py         # Сессия Doczilla с auto re-signin
@@ -26,6 +26,7 @@ app/
   static/
     admin.html         # Админ-панель (Alpine.js SPA)
     widget.html        # Виджет для iframe
+    lead_userfield.html# Handler USERFIELD_TYPE для поля лида
     install.html       # Страница установки Б24-приложения
   main.py
 deploy/
@@ -69,6 +70,23 @@ sudo certbot --nginx -d bridge.vird.cloud --email you@email.com --agree-tos
 
 После установки `/install` автоматически сохраняет OAuth-токены и делает `placement.bind` в `CRM_DEAL_DETAIL_TOOLBAR`.
 Скрипт `python scripts/register_bitrix_app.py` нужен только для принудительной перепривязки placement.
+
+Дополнительно можно зарегистрировать пользовательский тип поля для лида (USERFIELD_TYPE):
+
+```bash
+docker compose exec app python3 scripts/register_bitrix_app.py --register-lead-userfield
+```
+
+По умолчанию создаётся:
+- `USER_TYPE_ID=doczilla_field`
+- поле лида `FIELD_NAME=DOCZILLA`
+- handler: `https://<APP_PUBLIC_URL>/bitrix/lead-userfield`
+
+Удаление:
+
+```bash
+docker compose exec app python3 scripts/register_bitrix_app.py --unregister-lead-userfield
+```
 
 ## Обновление
 

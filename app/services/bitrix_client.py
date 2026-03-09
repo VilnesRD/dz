@@ -161,6 +161,13 @@ class BitrixClient:
             raise BitrixError(f"Сделка {deal_id} не найдена")
         return result
 
+    async def get_lead(self, lead_id: int | str) -> dict:
+        """Получить все поля лида по ID."""
+        result = await self._call("crm.lead.get", {"ID": lead_id})
+        if not result:
+            raise BitrixError(f"Лид {lead_id} не найден")
+        return result
+
     async def update_deal(self, deal_id: int | str, fields: dict[str, Any]) -> bool:
         """Обновить поля сделки. Возвращает True при успехе."""
         result = await self._call("crm.deal.update", {

@@ -120,7 +120,10 @@ async def admin_panel():
 # ── Ручной запуск для тестов ──────────────────────────────────────────────────
 
 class GenerateRequest(BaseModel):
-    deal_id: str
+    deal_id: str | None = None
+    lead_id: str | None = None
+    entity_type: str | None = None  # deal | lead
+    entity_id: str | None = None
     template_key: str = "contract"
     bitrix_domain: str | None = None
     bitrix_token: str | None = None
@@ -166,9 +169,65 @@ async def manual_generate(req: GenerateRequest):
     """Генерация документа для сделки через OAuth local app."""
     svc: DocumentGenerationService | None = None
     owns_bitrix_client = False
+    log_id: int | None = None
+
+    entity_type = str(req.entity_type or "").strip().lower()
+    entity_id = str(req.entity_id or "").strip()
+    if not entity_type:
+        if req.lead_id:
+            entity_type = "lead"
+            entity_id = str(req.lead_id)
+        else:
+            entity_type = "deal"
+            entity_id = str(req.deal_id or "")
+    if not entity_id:
+        raise HTTPException(400, "Не указан entity_id/deal_id/lead_id")
+    if entity_type not in {"deal", "lead"}:
+        raise HTTPException(400, "entity_type должен быть 'deal' или 'lead'")
+
+    def _safe_create_log() -> None:
+        nonlocal log_id
+        try:
+            from app.db.database import SessionLocal
+            from app.db import repository as repo
+            with SessionLocal() as db:
+                row = repo.create_log(
+                    db,
+                    deal_id=f"{entity_type}:{entity_id}",
+                    template_key=str(req.template_key),
+                    status="pending",
+                )
+                log_id = row.id
+        except Exception as e:
+            logger.warning("Не удалось создать запись лога генерации: %s", e)
+
+    def _safe_update_log(**kwargs) -> None:
+        if log_id is None:
+            return
+        try:
+            from app.db.database import SessionLocal
+            from app.db import repository as repo
+            with SessionLocal() as db:
+                repo.update_log(db, log_id, **kwargs)
+        except Exception as e:
+            logger.warning("Не удалось обновить запись лога генерации id=%s: %s", log_id, e)
+
+    _safe_create_log()
+
     try:
         svc, owns_bitrix_client = _build_generation_service(req.bitrix_domain, req.bitrix_token)
-        result = await svc.generate_for_deal(req.deal_id, req.template_key)
+        if entity_type == "lead":
+            result = await svc.generate_for_lead(entity_id, req.template_key)
+        else:
+            result = await svc.generate_for_deal(entity_id, req.template_key)
+        _safe_update_log(
+            template_id=result.template_id,
+            doc_id=result.doc_id,
+            doc_link=result.doc_link,
+            doc_name=result.doc_name,
+            status="success",
+            error_message=None,
+        )
         return {
             "status": "success",
             "doc_id": result.doc_id,
@@ -180,11 +239,17 @@ async def manual_generate(req: GenerateRequest):
             "warnings": result.warnings,
         }
     except KeyError as e:
+        _safe_update_log(status="error", error_message=str(e))
         raise HTTPException(404, str(e))
     except (BitrixError, DoczillaError) as e:
+        _safe_update_log(status="error", error_message=str(e))
         raise HTTPException(502, str(e))
     except RuntimeError as e:
+        _safe_update_log(status="error", error_message=str(e))
         raise HTTPException(503, str(e))
+    except Exception as e:
+        _safe_update_log(status="error", error_message=str(e))
+        raise
     finally:
         if owns_bitrix_client and svc:
             await svc.bitrix.close()

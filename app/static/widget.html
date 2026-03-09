@@ -170,35 +170,6 @@
     color: var(--error);
   }
   .status a { color: inherit; font-weight: 700; }
-  .status button {
-    margin-left: 8px;
-    border: none;
-    background: transparent;
-    color: inherit;
-    text-decoration: underline;
-    font-size: 12px;
-    cursor: pointer;
-    padding: 0;
-    font-family: inherit;
-  }
-  .inline-actions {
-    display: flex;
-    flex-wrap: wrap;
-    gap: 8px;
-    margin-top: 10px;
-  }
-  .inline-btn {
-    border: 1px solid currentColor;
-    background: transparent;
-    color: inherit;
-    border-radius: 6px;
-    padding: 6px 10px;
-    font-size: 12px;
-    font-weight: 700;
-    cursor: pointer;
-    font-family: inherit;
-  }
-  .inline-btn:hover { opacity: .88; }
 
   /* ── Spinner ── */
   .spinner {
@@ -295,7 +266,6 @@ const ctx = {
   token: '',
 };
 const templateMetaByKey = new Map();
-let autoCloseTicker = null;
 
 // ── Инициализация ─────────────────────────────────────────────────────────────
 document.addEventListener('DOMContentLoaded', async () => {
@@ -452,10 +422,7 @@ async function generate() {
     const mode = normalizeResultMode(data.result_mode || selectedMode);
     showSuccess(buildSuccessHtml(data, mode));
 
-    scheduleAutoClose(3000);
-
   } catch (err) {
-    cancelAutoClose();
     [1,2,3,4,5].forEach(i => {
       const el = document.getElementById('s' + i);
       if (!el.classList.contains('done')) el.classList.remove('active');
@@ -491,7 +458,6 @@ function setStep(n, state) {
 }
 
 function showSuccess(html) {
-  cancelAutoClose();
   document.getElementById('statusLoading').className = 'status loading';
   const el = document.getElementById('statusSuccess');
   el.innerHTML = html;
@@ -502,7 +468,6 @@ function showSuccess(html) {
 }
 
 function showError(msg) {
-  cancelAutoClose();
   document.getElementById('statusLoading').className = 'status loading';
   const el = document.getElementById('statusError');
   el.textContent = msg;
@@ -595,145 +560,12 @@ function buildSuccessHtml(data, mode) {
   const resultText = hasWarnings
     ? 'Документ создан. Проверьте предупреждения ниже.'
     : modeSuccessText(mode);
-  const dealActions = [
-    `<button type="button" class="inline-btn" onclick="goToDeal()">Вернуться к сделке</button>`,
-    `<button type="button" class="inline-btn" onclick="closeWidgetNow()">Закрыть окно</button>`,
-  ].join('');
   return (
     `✅ Документ <strong>${escHtml(data.doc_name)}</strong> создан.<br>` +
     `<a href="${escHtml(data.doc_link)}" target="_blank" rel="noopener">Открыть в Doczilla →</a><br>` +
     `<span style="opacity:.9">${escHtml(resultText)}</span>` +
-    `<div id="autoCloseHint" style="margin-top:8px"></div>` +
-    `<div class="inline-actions">${dealActions}</div>` +
     `${buildWarningsHtml(data)}`
   );
-}
-
-function callBxClose(bx) {
-  if (!bx) return false;
-  let called = false;
-  try {
-    if (typeof bx.closeApplication === 'function') {
-      bx.closeApplication();
-      called = true;
-    }
-    if (bx.placement && typeof bx.placement.call === 'function') {
-      bx.placement.call('close');
-      called = true;
-    }
-    if (typeof bx.closeWindow === 'function') {
-      bx.closeWindow();
-      called = true;
-    }
-  } catch (_e) {}
-  return called;
-}
-
-function closeWidgetNow() {
-  const attempts = [
-    () => callBxClose(window.BX24),
-    () => (window.parent && window.parent !== window) ? callBxClose(window.parent.BX24) : false,
-    () => (window.top && window.top !== window) ? callBxClose(window.top.BX24) : false,
-  ];
-  let called = false;
-  for (const tryClose of attempts) {
-    try {
-      if (tryClose()) called = true;
-    } catch (_e) {}
-  }
-  try {
-    window.close();
-    called = true;
-  } catch (_e) {}
-  return called;
-}
-
-function renderAutoCloseHint(msLeft) {
-  const holder = document.getElementById('autoCloseHint');
-  if (!holder) return;
-  const sec = Math.max(1, Math.ceil(msLeft / 1000));
-  holder.innerHTML =
-    `Окно закроется через <strong>${sec} c</strong>.` +
-    `<button type="button" onclick="cancelAutoClose(true)">Оставить открытым</button>`;
-}
-
-function renderAutoCloseFailedHint() {
-  const holder = document.getElementById('autoCloseHint');
-  if (!holder) return;
-  holder.innerHTML =
-    `Не удалось закрыть окно автоматически.` +
-    `<button type="button" onclick="goToDeal()">Вернуться к сделке</button>` +
-    `<button type="button" onclick="closeWidgetNow()">Повторить закрытие</button>`;
-}
-
-function cancelAutoClose(showNotice = false) {
-  if (autoCloseTicker) {
-    clearInterval(autoCloseTicker);
-    autoCloseTicker = null;
-  }
-  if (showNotice) {
-    const holder = document.getElementById('autoCloseHint');
-    if (holder) holder.textContent = 'Автозакрытие отключено.';
-  }
-}
-
-function scheduleAutoClose(delayMs = 3000) {
-  cancelAutoClose();
-  const startedAt = Date.now();
-  renderAutoCloseHint(delayMs);
-  autoCloseTicker = setInterval(() => {
-    const elapsed = Date.now() - startedAt;
-    const left = Math.max(0, delayMs - elapsed);
-    renderAutoCloseHint(left);
-    if (left <= 0) {
-      cancelAutoClose();
-      const requested = closeWidgetNow();
-      if (!requested) {
-        renderAutoCloseFailedHint();
-        return;
-      }
-      setTimeout(() => {
-        renderAutoCloseFailedHint();
-      }, 900);
-    }
-  }, 250);
-}
-
-function buildDealUrl() {
-  if (!ctx.domain || !ctx.dealId) return '';
-  const id = encodeURIComponent(String(ctx.dealId));
-  return `https://${ctx.domain}/crm/deal/details/${id}/`;
-}
-
-function goToDeal() {
-  const dealUrl = buildDealUrl();
-  if (!dealUrl) return;
-
-  try {
-    if (window.BX24 && typeof BX24.openPath === 'function') {
-      BX24.openPath(`/crm/deal/details/${ctx.dealId}/`);
-      closeWidgetNow();
-      return;
-    }
-  } catch (_e) {}
-
-  try {
-    if (window.top && window.top !== window) {
-      window.top.location.href = dealUrl;
-      return;
-    }
-  } catch (_e) {}
-  try {
-    if (window.parent && window.parent !== window) {
-      window.parent.location.href = dealUrl;
-      return;
-    }
-  } catch (_e) {}
-  try {
-    window.location.href = dealUrl;
-  } catch (_e) {
-    try { window.open(dealUrl, '_blank', 'noopener'); } catch (_err) {}
-  }
 }
 
 async function initContext() {

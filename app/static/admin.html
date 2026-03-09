@@ -254,8 +254,26 @@ textarea{resize:vertical;min-height:56px}
   display:flex;
   gap:6px;
   align-items:flex-start;
+  flex-wrap:wrap;
 }
-.selmap-rule-top input{flex:1}
+.selmap-rule-top input,
+.selmap-rule-top select{flex:1;min-width:170px}
+.selmap-op{
+  max-width:180px;
+  flex:0 0 180px;
+}
+.selmap-values{
+  width:100%;
+  min-height:76px;
+  max-height:120px;
+  border:1px solid var(--border);
+  border-radius:7px;
+  background:#fff;
+  color:var(--text);
+  font-size:12px;
+  padding:6px;
+}
+.selmap-values option{padding:2px 4px}
 .selmap-targets{
   width:100%;
   min-height:76px;
@@ -287,6 +305,10 @@ textarea{resize:vertical;min-height:56px}
   display:grid;
   grid-template-columns:1fr 1fr;
   gap:8px;
+}
+.selmap-source{
+  width:100%;
+  min-width:0;
 }
 
 @media (max-width: 1200px){
@@ -381,7 +403,7 @@ textarea{resize:vertical;min-height:56px}
         <div x-show="tmpls.length===0" class="empty card">Нет шаблонов.</div>
         <div x-show="tmpls.length>0" class="card" style="padding:0;overflow:hidden">
           <table class="tbl">
-            <thead><tr><th>Название / Ключ</th><th>Doczilla</th><th>Маппинг</th><th>Статус</th><th></th></tr></thead>
+            <thead><tr><th>Название / Ключ</th><th>Doczilla</th><th>Переменные</th><th>Статус</th><th></th></tr></thead>
             <tbody>
               <template x-for="t in tmpls" :key="t.id">
                 <tr>
@@ -396,8 +418,7 @@ textarea{resize:vertical;min-height:56px}
                   <td><span :class="t.mappings_count>0?'badge badge-green':'badge badge-gray'" x-text="`${t.mappings_count}/${t.mappings_total||0}`"></span></td>
                   <td><span :class="t.active?'badge badge-blue':'badge badge-gray'" x-text="t.active?'Активен':'Выкл'"></span></td>
                   <td><div class="flex">
-                    <button class="btn btn-ghost btn-sm" @click="openMapper(t)">Маппинг</button>
-                    <button class="btn btn-ghost btn-sm" @click="editT(t)">✏️</button>
+                    <button class="btn btn-ghost btn-sm" @click="openMapper(t)">Настройка шаблона</button>
                     <button class="btn btn-danger btn-sm" @click="delT(t.id)">🗑</button>
                   </div></td>
                 </tr>
@@ -421,6 +442,7 @@ textarea{resize:vertical;min-height:56px}
             </div>
           </div>
           <div class="flex">
+            <button class="btn btn-ghost" @click="editT(editTmpl)">⚙️ Параметры</button>
             <button class="btn btn-ghost" @click="refreshStruct()" :disabled="loadingStruct">
               <span x-show="loadingStruct" class="spinner-sm"></span>🔄 Обновить
             </button>
@@ -446,6 +468,7 @@ textarea{resize:vertical;min-height:56px}
               <option value="pdf">PDF</option>
               <option value="both">Ссылка и PDF</option>
             </select>
+            <div class="hint" x-text="resultSettingsSummary(editTmpl)"></div>
           </div>
           <div class="field" x-show="editTmpl.bitrix_result_mode==='link' || editTmpl.bitrix_result_mode==='both'">
             <label>Поле сделки для ссылки</label>
@@ -527,7 +550,7 @@ textarea{resize:vertical;min-height:56px}
                 <div class="row"><code>doc.103</code><span style="color:var(--muted)">значение другой переменной Doczilla (по её id)</span></div>
                 <div class="row"><code>{deal.NAME} {contact.LAST_NAME}</code><span style="color:var(--muted)">формула</span></div>
                 <div class="row"><code style="color:var(--success)">Москва</code><span style="color:var(--muted)">фиксированное значение</span></div>
-                <div class="row"><code>{"source_field":"deal.UF_CRM_LIST","options":{"Опция A":["201","202"]},"on_not_empty":"203","this_condition_id":"201"}</code><span style="color:var(--muted)">selector_map (мультивыбор и проверки empty/not_empty)</span></div>
+                <div class="row"><code>{"version":2,"source_field":"deal.UF_CRM_STAGE","rules":[{"operator":"in","values":["NEW","PREPAYMENT"],"targets":["201","202"]}],"on_not_empty":"203","this_condition_id":"201"}</code><span style="color:var(--muted)">selector_map v2 (визуальные правила зависимостей)</span></div>
                 <div style="margin-top:10px;padding-top:8px;border-top:1px solid var(--border)">
                   <span style="cursor:pointer;color:var(--accent)" @click="showB24=true;showHint=false">📋 Справочник полей Б24 →</span>
                 </div>
@@ -593,31 +616,61 @@ textarea{resize:vertical;min-height:56px}
                           <div class="selmap-sec">
                             <div class="selmap-title">Источник значения</div>
                             <div class="selmap-row">
-                              <input type="text"
+                              <select class="selmap-source"
                                 x-model="ensureSelMap(g.self).source_field"
-                                @input="syncSelMap(g.self)"
-                                :list="'sel-source-list-'+g.self.variable_id"
-                                placeholder="Выберите поле Б24 или doc.<id>">
+                                @change="onSelSourceFieldChange(g.self)">
+                                <option value="">— выберите поле Б24 —</option>
+                                <template x-for="f in b24Fields" :key="'gsrc-'+g.self.variable_id+'-'+f.path">
+                                  <option :value="f.path" x-text="f.label"></option>
+                                </template>
+                                <template x-for="o in selectorConditionOptions(g.self)" :key="'gdoc-'+g.self.variable_id+'-'+o.id">
+                                  <option :value="'doc.'+o.id" x-text="'Doczilla: '+o.label"></option>
+                                </template>
+                              </select>
                             </div>
-                            <datalist :id="'sel-source-list-'+g.self.variable_id">
-                              <template x-for="s in selectorSourceSuggestions(g.self)" :key="'src-'+g.self.variable_id+'-'+s">
-                                <option :value="s"></option>
-                              </template>
-                            </datalist>
-                            <div class="selmap-note" x-show="fLabel(ensureSelMap(g.self).source_field)" x-text="fLabel(ensureSelMap(g.self).source_field)"></div>
-                            <div class="selmap-note">Примеры: <code>deal.UF_CRM_STAGE</code>, <code>doc.103</code></div>
+                            <div class="selmap-note" x-show="selectorSourceMetaText(ensureSelMap(g.self).source_field)" x-text="selectorSourceMetaText(ensureSelMap(g.self).source_field)"></div>
+                            <div class="selmap-note" x-show="selectorOptionsState(ensureSelMap(g.self).source_field).loading">Загрузка значений поля…</div>
+                            <div class="selmap-note" x-show="selectorSourceOptions(ensureSelMap(g.self).source_field).length">
+                              Варианты значений: <strong x-text="selectorSourceOptions(ensureSelMap(g.self).source_field).length"></strong>
+                            </div>
                           </div>
 
                           <div class="selmap-sec">
                             <div class="selmap-title">Правила соответствия</div>
-                            <div class="selmap-note" style="margin-bottom:6px">Справа выберите одно или несколько condition-состояний.</div>
+                            <div class="selmap-note" style="margin-bottom:6px">Слева задайте условие по полю Б24, справа выберите condition-состояния Doczilla.</div>
                             <template x-if="!selectorConditionOptions(g.self).length">
                               <div class="selmap-empty">Нет condition-переменных для выбора.</div>
                             </template>
                             <template x-for="(r,ri) in ensureSelMap(g.self).rules" :key="r.rid || ('gsr'+ri)">
                               <div class="selmap-rule">
                                 <div class="selmap-rule-top">
-                                  <input type="text" x-model="r.value" @input="syncSelMap(g.self)" placeholder="Значение из Б24 (* = любое)">
+                                  <select class="selmap-op" x-model="r.operator" @change="onSelRuleOperatorChange(g.self,r)">
+                                    <template x-for="op in selectorOperators" :key="'gop-'+g.self.variable_id+'-'+op.value">
+                                      <option :value="op.value" x-text="op.label"></option>
+                                    </template>
+                                  </select>
+                                  <template x-if="ruleNeedsValue(r.operator)">
+                                    <div style="flex:1;min-width:170px">
+                                      <template x-if="selectorSourceHasOptions(ensureSelMap(g.self).source_field) && ruleUsesMultiValue(r.operator)">
+                                        <select multiple class="selmap-values" x-model="r.values" @change="syncSelMap(g.self)">
+                                          <template x-for="opt in selectorSourceOptions(ensureSelMap(g.self).source_field)" :key="'goptm-'+g.self.variable_id+'-'+ri+'-'+opt.value">
+                                            <option :value="opt.value" x-text="opt.label"></option>
+                                          </template>
+                                        </select>
+                                      </template>
+                                      <template x-if="selectorSourceHasOptions(ensureSelMap(g.self).source_field) && !ruleUsesMultiValue(r.operator)">
+                                        <select x-model="r.value" @change="syncSelMap(g.self)">
+                                          <option value="">— выберите значение —</option>
+                                          <template x-for="opt in selectorSourceOptions(ensureSelMap(g.self).source_field)" :key="'gopts-'+g.self.variable_id+'-'+ri+'-'+opt.value">
+                                            <option :value="opt.value" x-text="opt.label"></option>
+                                          </template>
+                                        </select>
+                                      </template>
+                                      <template x-if="!selectorSourceHasOptions(ensureSelMap(g.self).source_field)">
+                                        <input type="text" x-model="r.value" @input="syncSelMap(g.self)" :placeholder="selRulePlaceholder(r.operator)">
+                                      </template>
+                                    </div>
+                                  </template>
                                   <button class="selmap-reset" type="button" @click="delSelRule(g.self,ri)" title="Удалить правило">✕</button>
                                 </div>
                                 <select multiple class="selmap-targets" x-model="r.targets" @change="syncSelMap(g.self)">
@@ -625,7 +678,7 @@ textarea{resize:vertical;min-height:56px}
                                     <option :value="o.id" x-text="o.label"></option>
                                   </template>
                                 </select>
-                                <div class="selmap-note" x-text="'Если значение = '+(r.value||'—')+', активируем: '+selTargetsSummary(g.self,r.targets)"></div>
+                                <div class="selmap-note" x-text="selRuleSummary(g.self,r)"></div>
                               </div>
                             </template>
                             <div class="selmap-row">
@@ -708,31 +761,61 @@ textarea{resize:vertical;min-height:56px}
                           <div class="selmap-sec">
                             <div class="selmap-title">Источник значения</div>
                             <div class="selmap-row">
-                              <input type="text"
+                              <select class="selmap-source"
                                 x-model="ensureSelMap(m).source_field"
-                                @input="syncSelMap(m)"
-                                :list="'sel-source-list-'+m.variable_id"
-                                placeholder="Выберите поле Б24 или doc.<id>">
+                                @change="onSelSourceFieldChange(m)">
+                                <option value="">— выберите поле Б24 —</option>
+                                <template x-for="f in b24Fields" :key="'msrc-'+m.variable_id+'-'+f.path">
+                                  <option :value="f.path" x-text="f.label"></option>
+                                </template>
+                                <template x-for="o in selectorConditionOptions(m)" :key="'mdoc-'+m.variable_id+'-'+o.id">
+                                  <option :value="'doc.'+o.id" x-text="'Doczilla: '+o.label"></option>
+                                </template>
+                              </select>
                             </div>
-                            <datalist :id="'sel-source-list-'+m.variable_id">
-                              <template x-for="s in selectorSourceSuggestions(m)" :key="'src-'+m.variable_id+'-'+s">
-                                <option :value="s"></option>
-                              </template>
-                            </datalist>
-                            <div class="selmap-note" x-show="fLabel(ensureSelMap(m).source_field)" x-text="fLabel(ensureSelMap(m).source_field)"></div>
-                            <div class="selmap-note">Примеры: <code>deal.UF_CRM_STAGE</code>, <code>doc.103</code></div>
+                            <div class="selmap-note" x-show="selectorSourceMetaText(ensureSelMap(m).source_field)" x-text="selectorSourceMetaText(ensureSelMap(m).source_field)"></div>
+                            <div class="selmap-note" x-show="selectorOptionsState(ensureSelMap(m).source_field).loading">Загрузка значений поля…</div>
+                            <div class="selmap-note" x-show="selectorSourceOptions(ensureSelMap(m).source_field).length">
+                              Варианты значений: <strong x-text="selectorSourceOptions(ensureSelMap(m).source_field).length"></strong>
+                            </div>
                           </div>
 
                           <div class="selmap-sec">
                             <div class="selmap-title">Правила соответствия</div>
-                            <div class="selmap-note" style="margin-bottom:6px">Справа выберите одно или несколько condition-состояний.</div>
+                            <div class="selmap-note" style="margin-bottom:6px">Слева задайте условие по полю Б24, справа выберите condition-состояния Doczilla.</div>
                             <template x-if="!selectorConditionOptions(m).length">
                               <div class="selmap-empty">Нет condition-переменных для выбора.</div>
                             </template>
                             <template x-for="(r,ri) in ensureSelMap(m).rules" :key="r.rid || ('sr'+ri)">
                               <div class="selmap-rule">
                                 <div class="selmap-rule-top">
-                                  <input type="text" x-model="r.value" @input="syncSelMap(m)" placeholder="Значение из Б24 (* = любое)">
+                                  <select class="selmap-op" x-model="r.operator" @change="onSelRuleOperatorChange(m,r)">
+                                    <template x-for="op in selectorOperators" :key="'mop-'+m.variable_id+'-'+op.value">
+                                      <option :value="op.value" x-text="op.label"></option>
+                                    </template>
+                                  </select>
+                                  <template x-if="ruleNeedsValue(r.operator)">
+                                    <div style="flex:1;min-width:170px">
+                                      <template x-if="selectorSourceHasOptions(ensureSelMap(m).source_field) && ruleUsesMultiValue(r.operator)">
+                                        <select multiple class="selmap-values" x-model="r.values" @change="syncSelMap(m)">
+                                          <template x-for="opt in selectorSourceOptions(ensureSelMap(m).source_field)" :key="'moptm-'+m.variable_id+'-'+ri+'-'+opt.value">
+                                            <option :value="opt.value" x-text="opt.label"></option>
+                                          </template>
+                                        </select>
+                                      </template>
+                                      <template x-if="selectorSourceHasOptions(ensureSelMap(m).source_field) && !ruleUsesMultiValue(r.operator)">
+                                        <select x-model="r.value" @change="syncSelMap(m)">
+                                          <option value="">— выберите значение —</option>
+                                          <template x-for="opt in selectorSourceOptions(ensureSelMap(m).source_field)" :key="'mopts-'+m.variable_id+'-'+ri+'-'+opt.value">
+                                            <option :value="opt.value" x-text="opt.label"></option>
+                                          </template>
+                                        </select>
+                                      </template>
+                                      <template x-if="!selectorSourceHasOptions(ensureSelMap(m).source_field)">
+                                        <input type="text" x-model="r.value" @input="syncSelMap(m)" :placeholder="selRulePlaceholder(r.operator)">
+                                      </template>
+                                    </div>
+                                  </template>
                                   <button class="selmap-reset" type="button" @click="delSelRule(m,ri)" title="Удалить правило">✕</button>
                                 </div>
                                 <select multiple class="selmap-targets" x-model="r.targets" @change="syncSelMap(m)">
@@ -740,7 +823,7 @@ textarea{resize:vertical;min-height:56px}
                                     <option :value="o.id" x-text="o.label"></option>
                                   </template>
                                 </select>
-                                <div class="selmap-note" x-text="'Если значение = '+(r.value||'—')+', активируем: '+selTargetsSummary(m,r.targets)"></div>
+                                <div class="selmap-note" x-text="selRuleSummary(m,r)"></div>
                               </div>
                             </template>
                             <div class="selmap-row">
@@ -821,7 +904,7 @@ textarea{resize:vertical;min-height:56px}
               <template x-for="l in logs" :key="l.id">
                 <tr>
                   <td class="mono" style="white-space:nowrap" x-text="fmtD(l.created_at)"></td>
-                  <td x-text="'#'+l.deal_id"></td>
+                  <td x-text="logEntityLabel(l.deal_id)"></td>
                   <td class="mono" x-text="l.template_key"></td>
                   <td>
                     <div x-text="l.doc_name"></div>
@@ -859,50 +942,7 @@ textarea{resize:vertical;min-height:56px}
     <div class="field"><label>Шаблон имени файла</label>
       <input type="text" x-model="tForm.doc_name_template" placeholder="Договор {deal_id} от {date}">
       <div class="hint">{deal_id}, {company}, {date}</div></div>
-    <div class="field"><label>Как сохранять результат в Б24</label>
-      <select x-model="tForm.bitrix_result_mode">
-        <option value="link">Ссылка</option>
-        <option value="pdf">PDF</option>
-        <option value="both">Ссылка и PDF</option>
-      </select>
-    </div>
-    <div x-show="b24Loading" class="hint" style="margin-bottom:10px">Загружаем поля Битрикс24…</div>
-    <div class="field" x-show="tForm.bitrix_result_mode==='link' || tForm.bitrix_result_mode==='both'">
-      <label>Поле сделки для ссылки</label>
-      <select x-model="tForm.bitrix_deal_link_field" @change="syncResultFieldMeta(tForm,'link')">
-        <option value="">— выберите поле —</option>
-        <option
-          x-show="tForm.bitrix_deal_link_field && !hasDealLinkField(tForm.bitrix_deal_link_field)"
-          :value="tForm.bitrix_deal_link_field"
-          x-text="dealFieldOptionLabel(tForm.bitrix_deal_link_field)"
-        ></option>
-        <template x-for="f in dealLinkResultFields" :key="'lf-'+f.code">
-          <option :value="f.code" x-text="dealFieldOptionLabel(f.code)"></option>
-        </template>
-      </select>
-      <div class="hint">Показываются только поля сделки с типом «Ссылка»</div>
-    </div>
-    <div class="field" x-show="tForm.bitrix_result_mode==='pdf' || tForm.bitrix_result_mode==='both'">
-      <label>Поле сделки для PDF</label>
-      <select x-model="tForm.bitrix_deal_pdf_field" @change="syncResultFieldMeta(tForm,'pdf')">
-        <option value="">— выберите поле —</option>
-        <option
-          x-show="tForm.bitrix_deal_pdf_field && !hasDealPdfField(tForm.bitrix_deal_pdf_field)"
-          :value="tForm.bitrix_deal_pdf_field"
-          x-text="dealFieldOptionLabel(tForm.bitrix_deal_pdf_field)"
-        ></option>
-        <template x-for="f in dealPdfResultFields" :key="'pf-'+f.code">
-          <option :value="f.code" x-text="dealFieldOptionLabel(f.code)"></option>
-        </template>
-      </select>
-      <div class="hint">Показываются только FILE-поля сделки</div>
-    </div>
-    <div class="hint" x-show="!b24Loading && (tForm.bitrix_result_mode==='link' || tForm.bitrix_result_mode==='both') && !dealLinkResultFields.length">
-      Не найдены поля типа «Ссылка». Создайте URL-поле в сделке или выберите другой режим.
-    </div>
-    <div class="hint" x-show="!b24Loading && (tForm.bitrix_result_mode==='pdf' || tForm.bitrix_result_mode==='both') && !dealPdfResultFields.length">
-      Не найдены FILE-поля сделки для загрузки PDF.
-    </div>
+    <div class="hint" style="margin-bottom:10px">Настройка сохранения результата в Б24 выполняется на странице маппинга шаблона.</div>
     <div style="display:flex;gap:8px;justify-content:flex-end;margin-top:8px">
       <button class="btn btn-ghost" @click="showTmplModal=false">Отмена</button>
       <button class="btn btn-primary" @click="saveT()" :disabled="tLoading">
@@ -974,6 +1014,7 @@ function app() { return {
 
   // b24 fields
   showB24:false, b24Fields:[], b24LabelMap:{}, b24Loading:false, b24Q:'',
+  selectorFieldOptions:{},
 
   logs:[],
 
@@ -1035,7 +1076,6 @@ function app() { return {
     }finally{this.impLoading=false;}
   },
   async openNew(){
-    await this.loadB24();
     this.tForm={key:'',name:'',doczilla_file_id:'',doczilla_link:'',
       doczilla_folder_id:'00000000-0000-0000-0000-000000000000',
       doc_name_template:'Документ {deal_id} от {date}',
@@ -1049,7 +1089,6 @@ function app() { return {
     this.tErr=''; this.showTmplModal=true;
   },
   async editT(t){
-    await this.loadB24();
     this.tForm={...t};
     if(!('bitrix_result_mode' in this.tForm)) this.tForm.bitrix_result_mode='both';
     if(!('bitrix_deal_link_field' in this.tForm)) this.tForm.bitrix_deal_link_field='UF_CRM_DOCZILLA_LINK';
@@ -1079,6 +1118,7 @@ function app() { return {
     this.editTmpl=t; this.mAlert=''; this.mSearch=''; this.mFilt='all';
     this.applyResultSettingsDefaults(this.editTmpl);
     this.collapsed=new Set(); this.acClose();
+    this.selectorFieldOptions={};
     const raw=await this.req('GET',`/admin/templates/${t.id}/mappings`);
     raw.forEach((m,i)=>m._n=i+1);
     this.mappings=raw;
@@ -1098,6 +1138,7 @@ function app() { return {
       this.mappings=raw;
       this.rebuildMappingIndex();
       this.autoCollapseGroups();
+      this.selectorFieldOptions={};
       this.hydrateSelectorMaps();
       this.mAlert=`Загружено ${r.count} переменных`; this.mAlertT='success';
     }catch(e){this.mAlert='Ошибка: '+e.message;this.mAlertT='error';}
@@ -1231,9 +1272,47 @@ function app() { return {
   },
 
   // ── Selector map builder ───────────────────────────────────────
-  _newSelRule(value='', targets=[]){
+  get selectorOperators(){
+    return [
+      {value:'eq',label:'Равно'},
+      {value:'neq',label:'Не равно'},
+      {value:'in',label:'Содержит одно из'},
+      {value:'not_in',label:'Не содержит ни одного'},
+      {value:'contains',label:'Текст содержит'},
+      {value:'not_contains',label:'Текст не содержит'},
+      {value:'filled',label:'Поле заполнено'},
+      {value:'empty',label:'Поле пустое'},
+    ];
+  },
+  _normalizeRuleOperator(value){
+    const v=String(value||'').trim().toLowerCase();
+    return ['eq','neq','in','not_in','contains','not_contains','filled','empty'].includes(v) ? v : 'eq';
+  },
+  _normalizeRuleValues(value){
+    if(value===null||value===undefined) return [];
+    const list = Array.isArray(value) ? value : [value];
+    const out = [];
+    list.forEach(v=>{
+      String(v||'')
+        .split(/[;,|]/)
+        .map(x=>x.trim())
+        .filter(Boolean)
+        .forEach(x=>out.push(x));
+    });
+    return [...new Set(out)];
+  },
+  _newSelRule(rule={}){
     this._selRuleUid+=1;
-    return {rid:'sr'+this._selRuleUid,value:String(value||''),targets:this._normalizeIdsArray(targets)};
+    const op=this._normalizeRuleOperator(rule.operator||rule.op||'eq');
+    const values=this._normalizeRuleValues(rule.values!==undefined ? rule.values : rule.value);
+    const value=String(rule.value!==undefined ? rule.value : (values[0]||''));
+    return {
+      rid:'sr'+this._selRuleUid,
+      operator:op,
+      value:value,
+      values:values,
+      targets:this._normalizeIdsArray(rule.targets||rule.condition_ids||rule.condition_id||rule.set_true||rule.true_ids),
+    };
   },
   _normalizeIdsArray(value){
     if(value===null||value===undefined) return [];
@@ -1270,13 +1349,82 @@ function app() { return {
     }
     return out.sort((a,b)=>a.label.localeCompare(b.label,'ru'));
   },
-  selectorSourceSuggestions(m){
-    const b24=this.b24Fields
-      .map(f=>String(f?.path||'').trim())
-      .filter(Boolean)
-      .slice(0,300);
-    const doc=this.selectorConditionOptions(m).map(o=>`doc.${o.id}`);
-    return [...new Set([...b24,...doc])];
+  selectorOptionsState(path){
+    const p=String(path||'').trim();
+    if(!p) return {loading:false,error:'',loaded:false,options:[]};
+    return this.selectorFieldOptions[p] || {loading:false,error:'',loaded:false,options:[]};
+  },
+  selectorSourceOptions(path){
+    return this.selectorOptionsState(path).options || [];
+  },
+  selectorSourceHasOptions(path){
+    return this.selectorSourceOptions(path).length>0;
+  },
+  selectorSourceMeta(path){
+    const p=String(path||'').trim();
+    if(!p || p.startsWith('doc.')) return null;
+    return this.b24Fields.find(f=>String(f?.path||'')===p) || null;
+  },
+  selectorSourceMetaText(path){
+    const p=String(path||'').trim();
+    if(!p) return '';
+    if(p.startsWith('doc.')){
+      const id=p.slice(4).trim();
+      const opt=(this.mappings||[]).find(x=>String(x.variable_id||'')===id);
+      return opt ? `Источник: Doczilla ${opt.variable_name} (#${id})` : `Источник: Doczilla #${id}`;
+    }
+    const meta=this.selectorSourceMeta(p);
+    if(!meta) return '';
+    const many=meta.is_multiple?'множественное':'одиночное';
+    const type=(meta.user_type_id||meta.type||'').toString();
+    return `${meta.label} · ${type} · ${many}`;
+  },
+  selectorValueLabel(path,value){
+    const val=String(value||'').trim();
+    if(!val) return '';
+    const found=this.selectorSourceOptions(path).find(o=>String(o.value||'')===val);
+    return found ? String(found.label||val) : val;
+  },
+  selectorOperatorLabel(op){
+    const key=this._normalizeRuleOperator(op);
+    const item=this.selectorOperators.find(x=>x.value===key);
+    return item?item.label:key;
+  },
+  ruleNeedsValue(op){
+    const key=this._normalizeRuleOperator(op);
+    return key!=='filled' && key!=='empty';
+  },
+  ruleUsesMultiValue(op){
+    const key=this._normalizeRuleOperator(op);
+    return key==='in' || key==='not_in';
+  },
+  selRulePlaceholder(op){
+    const key=this._normalizeRuleOperator(op);
+    if(key==='in' || key==='not_in') return 'Значения через запятую';
+    if(key==='contains' || key==='not_contains') return 'Текст для проверки';
+    return 'Значение';
+  },
+  selRuleValueSummary(m,r){
+    const cfg=this.ensureSelMap(m);
+    const path=cfg.source_field;
+    const op=this._normalizeRuleOperator(r.operator);
+    if(op==='filled' || op==='empty') return '';
+    if(op==='in' || op==='not_in'){
+      const values=this._normalizeRuleValues((r.values&&r.values.length)?r.values:r.value);
+      if(!values.length) return '—';
+      const labels=values.map(v=>this.selectorValueLabel(path,v)||v);
+      return labels.length<=2 ? labels.join(', ') : `${labels.slice(0,2).join(', ')} +${labels.length-2}`;
+    }
+    const val=String(r.value||'').trim();
+    if(!val) return '—';
+    return this.selectorValueLabel(path,val)||val;
+  },
+  selRuleSummary(m,r){
+    const op=this.selectorOperatorLabel(r.operator);
+    const val=this.selRuleValueSummary(m,r);
+    const opKey=this._normalizeRuleOperator(r.operator);
+    const valuePart=(opKey==='filled'||opKey==='empty')?'':` "${val}"`;
+    return `Если ${op}${valuePart}, активируем: ${this.selTargetsSummary(m,r.targets)}`;
   },
   selTargetsSummary(m,targets){
     const ids=this._normalizeIdsArray(targets);
@@ -1287,10 +1435,51 @@ function app() { return {
     if(items.length<=2) return items.join(', ');
     return `${items.slice(0,2).join(', ')} +${items.length-2}`;
   },
+  async ensureSelectorFieldOptions(path){
+    const p=String(path||'').trim();
+    if(!p || p.startsWith('doc.')) return [];
+    const cur=this.selectorFieldOptions[p];
+    if(cur?.loading) return cur.options||[];
+    if(cur?.loaded) return cur.options||[];
+    this.selectorFieldOptions[p]={loading:true,loaded:false,error:'',options:[]};
+    try{
+      const r=await this.req('GET',`/admin/bitrix/field-options?path=${encodeURIComponent(p)}`);
+      const options=Array.isArray(r?.options)?r.options:[];
+      this.selectorFieldOptions[p]={loading:false,loaded:true,error:'',options};
+      return options;
+    }catch(e){
+      this.selectorFieldOptions[p]={loading:false,loaded:false,error:String(e?.message||e),options:[]};
+      return [];
+    }
+  },
+  async onSelSourceFieldChange(m){
+    const cfg=this.ensureSelMap(m);
+    cfg.source_field=String(cfg.source_field||'').trim();
+    await this.ensureSelectorFieldOptions(cfg.source_field);
+    cfg.rules.forEach(r=>{
+      if(this.ruleUsesMultiValue(r.operator)){
+        r.values=this._normalizeRuleValues(r.values&&r.values.length?r.values:r.value);
+        if(!r.value && r.values.length) r.value=r.values[0];
+      }else{
+        if(!r.value && r.values && r.values.length) r.value=r.values[0];
+      }
+    });
+    this.syncSelMap(m);
+  },
+  onSelRuleOperatorChange(m,r){
+    r.operator=this._normalizeRuleOperator(r.operator);
+    if(this.ruleUsesMultiValue(r.operator)){
+      r.values=this._normalizeRuleValues(r.values&&r.values.length?r.values:r.value);
+      if(!r.value && r.values.length) r.value=r.values[0];
+    }else{
+      if(!r.value && r.values && r.values.length) r.value=r.values[0];
+    }
+    this.syncSelMap(m);
+  },
   onSourceTypeChange(m){
     if(m.source_type==='selector_map'){
       this.ensureSelMap(m);
-      this.syncSelMap(m);
+      this.onSelSourceFieldChange(m);
     }else{
       m.source_value='';
       delete m._selMap;
@@ -1305,7 +1494,10 @@ function app() { return {
   },
   hydrateSelectorMaps(){
     this.mappings.forEach(m=>{
-      if(m.source_type==='selector_map') this.ensureSelMap(m);
+      if(m.source_type==='selector_map'){
+        const cfg=this.ensureSelMap(m);
+        if(cfg.source_field) this.ensureSelectorFieldOptions(cfg.source_field);
+      }
     });
   },
   ensureSelMap(m){
@@ -1314,15 +1506,31 @@ function app() { return {
     try{
       const raw=JSON.parse(m.source_value||'{}');
       cfg.source_field=String(raw.source_field||'').trim();
-      if(raw.options&&typeof raw.options==='object'){
+      if(Array.isArray(raw.rules)){
+        raw.rules.forEach(rule=>{
+          cfg.rules.push(this._newSelRule(rule||{}));
+        });
+      }else if(raw.options&&typeof raw.options==='object'){
         Object.entries(raw.options).forEach(([k,v])=>{
-          cfg.rules.push(this._newSelRule(String(k||''),v));
+          const expected=String(k||'').trim();
+          const expectedNorm=expected.toLowerCase();
+          if(expectedNorm==='*' || expectedNorm==='__any__' || expectedNorm==='__non_empty__'){
+            cfg.on_not_empty=[...new Set([...cfg.on_not_empty,...this._normalizeIdsArray(v)])];
+            return;
+          }
+          const values=this._normalizeRuleValues(expected);
+          cfg.rules.push(this._newSelRule({
+            operator: values.length>1 ? 'in' : 'eq',
+            values: values,
+            value: values[0]||expected,
+            targets: v,
+          }));
         });
       }
       cfg.on_not_empty=this._normalizeIdsArray(raw.on_not_empty);
       cfg.on_empty=this._normalizeIdsArray(raw.on_empty);
     }catch(_e){}
-    if(!cfg.rules.length) cfg.rules=[this._newSelRule('',[])];
+    if(!cfg.rules.length) cfg.rules=[this._newSelRule()];
     m._selMap=cfg;
     return m._selMap;
   },
@@ -1332,12 +1540,27 @@ function app() { return {
   },
   syncSelMap(m){
     const cfg=this.ensureSelMap(m);
-    const out={source_field:String(cfg.source_field||'').trim(),options:{},this_condition_id:String(m.variable_id)};
+    const out={
+      version:2,
+      source_field:String(cfg.source_field||'').trim(),
+      rules:[],
+      this_condition_id:String(m.variable_id),
+    };
     cfg.rules.forEach(r=>{
-      const key=String(r.value||'').trim();
+      const op=this._normalizeRuleOperator(r.operator);
       const ids=this._normalizeIdsArray(r.targets);
-      if(!key||!ids.length) return;
-      out.options[key]=this._oneOrMany(ids);
+      if(!ids.length) return;
+      const row={operator:op,targets:this._oneOrMany(ids)};
+      if(this.ruleUsesMultiValue(op)){
+        const vals=this._normalizeRuleValues((r.values&&r.values.length)?r.values:r.value);
+        if(!vals.length) return;
+        row.values=vals;
+      }else if(this.ruleNeedsValue(op)){
+        const val=String(r.value||'').trim();
+        if(!val) return;
+        row.value=val;
+      }
+      out.rules.push(row);
     });
     const onNotEmpty=this._normalizeIdsArray(cfg.on_not_empty);
     const onEmpty=this._normalizeIdsArray(cfg.on_empty);
@@ -1347,13 +1570,13 @@ function app() { return {
   },
   addSelRule(m){
     const cfg=this.ensureSelMap(m);
-    cfg.rules.push(this._newSelRule('',[]));
+    cfg.rules.push(this._newSelRule());
     this.syncSelMap(m);
   },
   delSelRule(m,idx){
     const cfg=this.ensureSelMap(m);
     cfg.rules.splice(idx,1);
-    if(!cfg.rules.length) cfg.rules.push(this._newSelRule('',[]));
+    if(!cfg.rules.length) cfg.rules.push(this._newSelRule());
     this.syncSelMap(m);
   },
 
@@ -1446,7 +1669,7 @@ function app() { return {
     const raw=String(f.label||'').trim();
     const code=String(f.code||'').trim();
     const entity=String(f.entity || String(f.path||'').split('.')[0] || '').toLowerCase();
-    const entityRu={deal:'Сделка',contact:'Контакт',company:'Компания'}[entity]||'Поле';
+    const entityRu={deal:'Сделка',lead:'Лид',contact:'Контакт',company:'Компания'}[entity]||'Поле';
     if(this._isCodeLikeLabel(raw,code) && code.toUpperCase().startsWith('UF_')){
       return `${entityRu}: ${this._humanizeUfCode(code)} (${code})`;
     }
@@ -1485,6 +1708,18 @@ function app() { return {
     const c=String(code||'').trim();
     if(!c) return false;
     return this.dealPdfResultFields.some(f=>String(f.code)===c);
+  },
+  resultSettingsSummary(target){
+    if(!target) return '';
+    const mode=String(target.bitrix_result_mode||'both').toLowerCase();
+    const modeTitle={link:'Ссылка',pdf:'PDF',both:'Ссылка и PDF'}[mode]||'Ссылка и PDF';
+    const link=String(target.bitrix_deal_link_field||'').trim();
+    const pdf=String(target.bitrix_deal_pdf_field||'').trim();
+    const linkTxt=link?this.dealFieldOptionLabel(link):'не выбрано';
+    const pdfTxt=pdf?this.dealFieldOptionLabel(pdf):'не выбрано';
+    if(mode==='link') return `Текущее: ${modeTitle}, поле ссылки: ${linkTxt}`;
+    if(mode==='pdf') return `Текущее: ${modeTitle}, поле PDF: ${pdfTxt}`;
+    return `Текущее: ${modeTitle}, ссылка: ${linkTxt}, PDF: ${pdfTxt}`;
   },
   syncResultFieldMeta(target, kind){
     if(!target) return;
@@ -1574,6 +1809,16 @@ function app() { return {
   srcPh(t){return{field:'deal.TITLE',formula:'{deal.NAME} {contact.LAST_NAME}',literal:'Фиксированное значение'}[t]||'';},
   kindBadge(k){return{variable:'badge badge-blue',condition:'badge badge-purple',selector:'badge badge-amber',replicator:'badge badge-teal'}[k]||'badge badge-gray';},
   typeBadge(t){return{string:'badge badge-gray',number:'badge badge-blue',date:'badge badge-purple',money:'badge badge-green',boolean:'badge badge-amber',percent:'badge badge-amber',link:'badge badge-teal'}[t]||'badge badge-gray';},
+  logEntityLabel(raw){
+    const v=String(raw||'').trim();
+    if(!v) return '—';
+    const m=v.match(/^([a-z_]+):(.*)$/i);
+    if(!m) return '#'+v;
+    const ent=String(m[1]||'').toLowerCase();
+    const id=String(m[2]||'').trim();
+    const title={deal:'Сделка',lead:'Лид'}[ent]||ent;
+    return `${title} #${id}`;
+  },
   fmtD(iso){if(!iso)return'—';return new Date(iso).toLocaleString('ru-RU',{day:'2-digit',month:'2-digit',hour:'2-digit',minute:'2-digit'});},
 
   // ── api ───────────────────────────────────────────────────────

@@ -1,6 +1,7 @@
 """
 Эндпоинты для виджета Битрикс24:
     GET/POST /bitrix/widget     — HTML виджета (iframe в карточке сделки)
+    GET/POST /bitrix/lead-userfield — handler USERFIELD_TYPE для поля лида
     GET      /api/widget-config — список активных шаблонов для <select>
     GET/POST /install           — установка: сохраняем токены + регистрируем кнопку
 """
@@ -254,6 +255,12 @@ async def serve_widget_get(request: Request):
     return FileResponse(STATIC_DIR / "widget.html", media_type="text/html", headers=NO_CACHE_HEADERS)
 
 
+@router.get("/bitrix/lead-userfield", response_class=FileResponse, include_in_schema=False)
+async def serve_lead_userfield_get(request: Request):
+    """GET — обработчик пользовательского типа поля (USERFIELD_TYPE) для лида."""
+    return FileResponse(STATIC_DIR / "lead_userfield.html", media_type="text/html", headers=NO_CACHE_HEADERS)
+
+
 @router.get("/assets/doczilla-logo.png", include_in_schema=False)
 async def serve_doczilla_logo_png():
     return FileResponse(STATIC_DIR / "doczilla-pink-32x32.png", media_type="image/png", headers=NO_CACHE_HEADERS)
@@ -303,6 +310,46 @@ async def serve_widget_post(request: Request):
         qs["TEMPLATE_KEY"] = template_key
 
     target = str(request.url_for("serve_widget_get"))
+    if qs:
+        target = f"{target}?{urlencode(qs)}"
+    return RedirectResponse(url=target, status_code=303)
+
+
+@router.post("/bitrix/lead-userfield", response_class=FileResponse, include_in_schema=False)
+async def serve_lead_userfield_post(request: Request):
+    """
+    POST — Б24 может открыть handler USERFIELD_TYPE через form-data.
+    Преобразуем в redirect на GET + query params.
+    """
+    form = dict(await request.form())
+    logger.info("lead-userfield POST form keys: %s", sorted(form.keys()))
+
+    lead_id = _pick(
+        form.get("LEAD_ID"),
+        form.get("lead_id"),
+        form.get("ID"),
+        form.get("ENTITY_ID"),
+        form.get("ENTITY_VALUE_ID"),
+    )
+    domain = _normalize_domain(_pick(
+        form.get("DOMAIN"),
+        form.get("domain"),
+        form.get("auth[domain]"),
+    ))
+    value = _pick(form.get("VALUE"), form.get("value"))
+    mode = _pick(form.get("MODE"), form.get("mode"))
+
+    qs = {}
+    if lead_id:
+        qs["LEAD_ID"] = lead_id
+    if domain:
+        qs["DOMAIN"] = domain
+    if value:
+        qs["VALUE"] = value
+    if mode:
+        qs["MODE"] = mode
+
+    target = str(request.url_for("serve_lead_userfield_get"))
     if qs:
         target = f"{target}?{urlencode(qs)}"
     return RedirectResponse(url=target, status_code=303)

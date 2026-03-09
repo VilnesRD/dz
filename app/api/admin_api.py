@@ -451,159 +451,95 @@ async def get_bitrix_fields(
         )
 
     client = BitrixClient(domain=domain, access_token=auth_id)
-    stats = {"deal": 0, "contact": 0, "company": 0}
-    custom_stats = {"deal": 0, "contact": 0, "company": 0}
-    uf_label_stats = {"deal": 0, "contact": 0, "company": 0}
+    entity_defs = {
+        "deal": {
+            "legacy_method": "crm.deal.fields",
+            "item_entity_type_id": 2,
+            "uf_method": "crm.deal.userfield.list",
+            "label_prefix": "Сделка",
+        },
+        "lead": {
+            "legacy_method": "crm.lead.fields",
+            "item_entity_type_id": 1,
+            "uf_method": "crm.lead.userfield.list",
+            "label_prefix": "Лид",
+        },
+        "contact": {
+            "legacy_method": "crm.contact.fields",
+            "item_entity_type_id": 3,
+            "uf_method": "crm.contact.userfield.list",
+            "label_prefix": "Контакт",
+        },
+        "company": {
+            "legacy_method": "crm.company.fields",
+            "item_entity_type_id": 4,
+            "uf_method": "crm.company.userfield.list",
+            "label_prefix": "Компания",
+        },
+    }
+    stats = {k: 0 for k in entity_defs.keys()}
+    custom_stats = {k: 0 for k in entity_defs.keys()}
+    uf_label_stats = {k: 0 for k in entity_defs.keys()}
     errors: list[str] = []
     try:
         # Названия кастомных UF_* полей берём из userfield.list
-        deal_uf_meta: dict[str, dict[str, Any]] = {}
-        contact_uf_meta: dict[str, dict[str, Any]] = {}
-        company_uf_meta: dict[str, dict[str, Any]] = {}
-        deal_uf_labels: dict[str, str] = {}
-        contact_uf_labels: dict[str, str] = {}
-        company_uf_labels: dict[str, str] = {}
-        try:
-            deal_uf_rows = await _call_bitrix_list_all(client, "crm.deal.userfield.list")
-            deal_uf_meta = _build_userfield_meta_map(deal_uf_rows)
-            deal_uf_labels = {code: str(meta.get("label") or code) for code, meta in deal_uf_meta.items()}
-            uf_label_stats["deal"] = len(deal_uf_labels)
-        except Exception as e:
-            log.warning("crm.deal.userfield.list: %s", e)
-            errors.append(f"deal.userfield: {e}")
-        try:
-            contact_uf_rows = await _call_bitrix_list_all(client, "crm.contact.userfield.list")
-            contact_uf_meta = _build_userfield_meta_map(contact_uf_rows)
-            contact_uf_labels = {code: str(meta.get("label") or code) for code, meta in contact_uf_meta.items()}
-            uf_label_stats["contact"] = len(contact_uf_labels)
-        except Exception as e:
-            log.warning("crm.contact.userfield.list: %s", e)
-            errors.append(f"contact.userfield: {e}")
-        try:
-            company_uf_rows = await _call_bitrix_list_all(client, "crm.company.userfield.list")
-            company_uf_meta = _build_userfield_meta_map(company_uf_rows)
-            company_uf_labels = {code: str(meta.get("label") or code) for code, meta in company_uf_meta.items()}
-            uf_label_stats["company"] = len(company_uf_labels)
-        except Exception as e:
-            log.warning("crm.company.userfield.list: %s", e)
-            errors.append(f"company.userfield: {e}")
+        uf_meta_by_entity: dict[str, dict[str, dict[str, Any]]] = {k: {} for k in entity_defs.keys()}
+        uf_labels_by_entity: dict[str, dict[str, str]] = {k: {} for k in entity_defs.keys()}
+        for entity, cfg in entity_defs.items():
+            try:
+                uf_rows = await _call_bitrix_list_all(client, cfg["uf_method"])
+                uf_meta = _build_userfield_meta_map(uf_rows)
+                uf_labels = {code: str(meta.get("label") or code) for code, meta in uf_meta.items()}
+                uf_meta_by_entity[entity] = uf_meta
+                uf_labels_by_entity[entity] = uf_labels
+                uf_label_stats[entity] = len(uf_labels)
+            except Exception as e:
+                log.warning("%s: %s", cfg["uf_method"], e)
+                errors.append(f"{entity}.userfield: {e}")
 
-        # Поля сделки
-        deal_fields = await _load_crm_entity_fields(
-            client=client,
-            legacy_method="crm.deal.fields",
-            item_entity_type_id=2,
-            log_key="deal",
-            errors=errors,
-        )
-        for fname, finfo in deal_fields.items():
-            code = str(fname)
-            norm_code = _normalize_uf_code(code)
-            is_custom = _is_uf_field_code(code)
-            uf_meta = deal_uf_meta.get(norm_code, {})
-            title = _extract_field_title(finfo, code)
-            if is_custom:
-                title = _resolve_userfield_title(code, finfo, deal_uf_labels)
-            field_type = _extract_field_type(finfo)
-            user_type_id = _normalize_user_type_id(uf_meta.get("user_type_id")) or _extract_field_user_type_id(finfo)
-            is_multiple = bool(uf_meta.get("is_multiple")) or _extract_field_is_multiple(finfo)
-            can_store_link, can_store_pdf = _detect_result_storage_capabilities(field_type, user_type_id)
-            fields.append({
-                "path": f"deal.{code}",
-                "entity": "deal",
-                "code": code,
-                "label": f"Сделка: {title}",
-                "type": field_type,
-                "user_type_id": user_type_id,
-                "is_custom": is_custom,
-                "is_multiple": is_multiple,
-                "can_store_link": can_store_link,
-                "can_store_pdf": can_store_pdf,
-            })
-        stats["deal"] = len(deal_fields)
-        custom_stats["deal"] = len([k for k in deal_fields.keys() if str(k).upper().startswith("UF_")])
-
-        # Поля контакта
-        contact_fields = await _load_crm_entity_fields(
-            client=client,
-            legacy_method="crm.contact.fields",
-            item_entity_type_id=3,
-            log_key="contact",
-            errors=errors,
-        )
-        for fname, finfo in contact_fields.items():
-            code = str(fname)
-            norm_code = _normalize_uf_code(code)
-            is_custom = _is_uf_field_code(code)
-            uf_meta = contact_uf_meta.get(norm_code, {})
-            title = _extract_field_title(finfo, code)
-            if is_custom:
-                title = _resolve_userfield_title(code, finfo, contact_uf_labels)
-            field_type = _extract_field_type(finfo)
-            user_type_id = _normalize_user_type_id(uf_meta.get("user_type_id")) or _extract_field_user_type_id(finfo)
-            is_multiple = bool(uf_meta.get("is_multiple")) or _extract_field_is_multiple(finfo)
-            can_store_link, can_store_pdf = _detect_result_storage_capabilities(field_type, user_type_id)
-            fields.append({
-                "path": f"contact.{code}",
-                "entity": "contact",
-                "code": code,
-                "label": f"Контакт: {title}",
-                "type": field_type,
-                "user_type_id": user_type_id,
-                "is_custom": is_custom,
-                "is_multiple": is_multiple,
-                "can_store_link": can_store_link,
-                "can_store_pdf": can_store_pdf,
-            })
-        stats["contact"] = len(contact_fields)
-        custom_stats["contact"] = len([k for k in contact_fields.keys() if str(k).upper().startswith("UF_")])
-
-        # Поля компании
-        company_fields = await _load_crm_entity_fields(
-            client=client,
-            legacy_method="crm.company.fields",
-            item_entity_type_id=4,
-            log_key="company",
-            errors=errors,
-        )
-        for fname, finfo in company_fields.items():
-            code = str(fname)
-            norm_code = _normalize_uf_code(code)
-            is_custom = _is_uf_field_code(code)
-            uf_meta = company_uf_meta.get(norm_code, {})
-            title = _extract_field_title(finfo, code)
-            if is_custom:
-                title = _resolve_userfield_title(code, finfo, company_uf_labels)
-            field_type = _extract_field_type(finfo)
-            user_type_id = _normalize_user_type_id(uf_meta.get("user_type_id")) or _extract_field_user_type_id(finfo)
-            is_multiple = bool(uf_meta.get("is_multiple")) or _extract_field_is_multiple(finfo)
-            can_store_link, can_store_pdf = _detect_result_storage_capabilities(field_type, user_type_id)
-            fields.append({
-                "path": f"company.{code}",
-                "entity": "company",
-                "code": code,
-                "label": f"Компания: {title}",
-                "type": field_type,
-                "user_type_id": user_type_id,
-                "is_custom": is_custom,
-                "is_multiple": is_multiple,
-                "can_store_link": can_store_link,
-                "can_store_pdf": can_store_pdf,
-            })
-        stats["company"] = len(company_fields)
-        custom_stats["company"] = len([k for k in company_fields.keys() if str(k).upper().startswith("UF_")])
+        for entity, cfg in entity_defs.items():
+            entity_fields = await _load_crm_entity_fields(
+                client=client,
+                legacy_method=cfg["legacy_method"],
+                item_entity_type_id=cfg["item_entity_type_id"],
+                log_key=entity,
+                errors=errors,
+            )
+            uf_meta = uf_meta_by_entity.get(entity, {})
+            uf_labels = uf_labels_by_entity.get(entity, {})
+            for fname, finfo in entity_fields.items():
+                code = str(fname)
+                norm_code = _normalize_uf_code(code)
+                is_custom = _is_uf_field_code(code)
+                row_meta = uf_meta.get(norm_code, {})
+                title = _extract_field_title(finfo, code)
+                if is_custom:
+                    title = _resolve_userfield_title(code, finfo, uf_labels)
+                field_type = _extract_field_type(finfo)
+                user_type_id = _normalize_user_type_id(row_meta.get("user_type_id")) or _extract_field_user_type_id(finfo)
+                is_multiple = bool(row_meta.get("is_multiple")) or _extract_field_is_multiple(finfo)
+                can_store_link, can_store_pdf = _detect_result_storage_capabilities(field_type, user_type_id)
+                fields.append({
+                    "path": f"{entity}.{code}",
+                    "entity": entity,
+                    "code": code,
+                    "label": f"{cfg['label_prefix']}: {title}",
+                    "type": field_type,
+                    "user_type_id": user_type_id,
+                    "is_custom": is_custom,
+                    "is_multiple": is_multiple,
+                    "can_store_link": can_store_link,
+                    "can_store_pdf": can_store_pdf,
+                })
+            stats[entity] = len(entity_fields)
+            custom_stats[entity] = len([k for k in entity_fields.keys() if str(k).upper().startswith("UF_")])
     except BitrixError as e:
         raise HTTPException(status.HTTP_502_BAD_GATEWAY, str(e))
     finally:
         await client.close()
 
     fields.sort(key=lambda x: x.get("path", ""))
-    log.info(
-        "bitrix fields loaded: deal=%d contact=%d company=%d total=%d | custom: deal=%d contact=%d company=%d | uf labels: deal=%d contact=%d company=%d",
-        stats["deal"], stats["contact"], stats["company"], len(fields),
-        custom_stats["deal"], custom_stats["contact"], custom_stats["company"],
-        uf_label_stats["deal"], uf_label_stats["contact"], uf_label_stats["company"],
-    )
+    log.info("bitrix fields loaded: stats=%s total=%d | custom=%s | uf labels=%s", stats, len(fields), custom_stats, uf_label_stats)
     return {
         "fields": fields,
         "meta": {
@@ -613,6 +549,148 @@ async def get_bitrix_fields(
             "errors": errors,
         },
     }
+
+
+@router.get("/bitrix/field-options")
+async def get_bitrix_field_options(
+    path: str,
+    domain: str | None = None,
+    auth_id: str | None = None,
+    _=Depends(current_user),
+):
+    """
+    Вернуть варианты значений для конкретного поля Б24.
+    Используется UI-конструктором условий (selector_map).
+    """
+    from app.services.bitrix_client import BitrixClient, BitrixError
+    from app.db.database import SessionLocal
+    from app.db import repository as repo
+
+    raw_path = str(path or "").strip()
+    if "." not in raw_path:
+        raise HTTPException(status.HTTP_400_BAD_REQUEST, "Параметр path должен быть в формате entity.FIELD")
+    entity, field_code = raw_path.split(".", 1)
+    entity = str(entity or "").strip().lower()
+    field_code = str(field_code or "").strip()
+    if entity not in {"deal", "lead", "contact", "company"}:
+        raise HTTPException(status.HTTP_400_BAD_REQUEST, "Поддерживаются только entity: deal/lead/contact/company")
+    if not field_code:
+        raise HTTPException(status.HTTP_400_BAD_REQUEST, "Не указан код поля")
+
+    if not domain:
+        with SessionLocal() as db:
+            token = repo.get_latest_oauth_token(db)
+        domain = token.domain if token else None
+    if not domain:
+        raise HTTPException(
+            status.HTTP_400_BAD_REQUEST,
+            "Не найден домен Битрикс24. Переустановите локальное приложение и повторите запрос.",
+        )
+
+    entity_cfg = {
+        "deal": {
+            "legacy_method": "crm.deal.fields",
+            "item_entity_type_id": 2,
+            "uf_method": "crm.deal.userfield.list",
+        },
+        "lead": {
+            "legacy_method": "crm.lead.fields",
+            "item_entity_type_id": 1,
+            "uf_method": "crm.lead.userfield.list",
+        },
+        "contact": {
+            "legacy_method": "crm.contact.fields",
+            "item_entity_type_id": 3,
+            "uf_method": "crm.contact.userfield.list",
+        },
+        "company": {
+            "legacy_method": "crm.company.fields",
+            "item_entity_type_id": 4,
+            "uf_method": "crm.company.userfield.list",
+        },
+    }[entity]
+
+    client = BitrixClient(domain=domain, access_token=auth_id)
+    errors: list[str] = []
+    options: list[dict[str, str]] = []
+    field_meta: dict[str, Any] = {}
+    try:
+        fields = await _load_crm_entity_fields(
+            client=client,
+            legacy_method=entity_cfg["legacy_method"],
+            item_entity_type_id=entity_cfg["item_entity_type_id"],
+            log_key=f"{entity}.field_options",
+            errors=errors,
+        )
+        field_meta = fields.get(field_code) or fields.get(field_code.upper()) or {}
+        norm_code = _normalize_uf_code(field_code)
+        if not field_meta and norm_code in fields:
+            field_meta = fields.get(norm_code) or {}
+        field_type = _extract_field_type(field_meta)
+        user_type_id = _extract_field_user_type_id(field_meta)
+        is_multiple = _extract_field_is_multiple(field_meta)
+        title = _extract_field_title(field_meta, field_code)
+
+        # 1) Для UF_* сначала пытаемся взять справочник из userfield.list
+        if _is_uf_field_code(field_code):
+            try:
+                uf_rows = await _call_bitrix_list_all(client, entity_cfg["uf_method"])
+                uf_meta_map = _build_userfield_meta_map(uf_rows)
+                uf_meta = uf_meta_map.get(norm_code, {})
+                uf_row = _find_userfield_row_by_code(uf_rows, norm_code)
+                options = _extract_userfield_options(uf_row)
+                if uf_meta:
+                    if not user_type_id:
+                        user_type_id = _normalize_user_type_id(uf_meta.get("user_type_id"))
+                    if not is_multiple:
+                        is_multiple = bool(uf_meta.get("is_multiple"))
+                if _is_code_like_title(title, norm_code):
+                    title = _resolve_userfield_title(norm_code, field_meta or uf_row, {
+                        norm_code: str(uf_meta.get("label") or norm_code),
+                    })
+            except Exception as e:
+                errors.append(f"{entity}.userfield.list: {e}")
+
+        # 2) Варианты, если они пришли прямо в meta поля
+        if not options:
+            options = _extract_enum_options_from_meta(field_meta)
+
+        # 3) Для crm_status пытаемся получить справочник crm.status.list
+        status_entity_id = _guess_status_entity_id(entity, field_code, field_meta)
+        if not options and status_entity_id:
+            try:
+                status_rows = await _call_bitrix_list_all(
+                    client,
+                    "crm.status.list",
+                    {"filter": {"ENTITY_ID": status_entity_id}},
+                )
+                options = _extract_status_options(status_rows)
+            except Exception as e:
+                errors.append(f"crm.status.list({status_entity_id}): {e}")
+
+        # 4) Приведение/дедупликация
+        options = _normalize_option_rows(options)
+        return {
+            "path": f"{entity}.{field_code}",
+            "field": {
+                "entity": entity,
+                "code": field_code,
+                "label": title,
+                "type": field_type,
+                "user_type_id": user_type_id,
+                "is_multiple": bool(is_multiple),
+            },
+            "options": options,
+            "meta": {
+                "count": len(options),
+                "status_entity_id": status_entity_id or "",
+                "errors": errors,
+            },
+        }
+    except BitrixError as e:
+        raise HTTPException(status.HTTP_502_BAD_GATEWAY, str(e))
+    finally:
+        await client.close()
 
 
 # ── Helpers ───────────────────────────────────────────────────────────────────
@@ -850,6 +928,8 @@ def _normalize_uf_code(code: Any) -> str:
     text = str(code or "").strip()
     if not text:
         return ""
+    if re.match(r"(?i)^uf(?:_|)?crm", text) or text.upper().startswith("UF_"):
+        return _canonicalize_uf_code(text)
     legacy = _to_legacy_field_code(text)
     if legacy:
         return legacy
@@ -960,6 +1040,8 @@ def _extract_field_type(meta: Any) -> str:
     if not isinstance(meta, dict):
         return ""
     value = _pick_row_value(meta, "type", "TYPE", "fieldType", "FIELD_TYPE")
+    if isinstance(value, dict):
+        value = _pick_row_value(value, "id", "ID", "type", "TYPE", "name", "NAME", "value", "VALUE")
     return str(value or "").strip().lower()
 
 
@@ -967,6 +1049,15 @@ def _extract_field_user_type_id(meta: Any) -> str:
     if not isinstance(meta, dict):
         return ""
     value = _pick_row_value(meta, "userType", "USER_TYPE_ID", "userTypeId", "USER_TYPE")
+    if isinstance(value, dict):
+        value = _pick_row_value(
+            value,
+            "id", "ID",
+            "type", "TYPE",
+            "userTypeId", "USER_TYPE_ID",
+            "name", "NAME",
+            "value", "VALUE",
+        )
     return _normalize_user_type_id(value)
 
 
@@ -994,6 +1085,175 @@ def _detect_result_storage_capabilities(field_type: str, user_type_id: str) -> t
     can_store_link = ft in {"url"} or ut in {"url", "webaddress", "hyperlink"}
 
     return can_store_link, can_store_pdf
+
+
+def _normalize_option_rows(items: Any) -> list[dict[str, str]]:
+    """
+    Привести массив вариантов к формату:
+      [{"value":"...", "label":"..."}, ...]
+    """
+    if not isinstance(items, list):
+        return []
+    out: list[dict[str, str]] = []
+    seen: set[str] = set()
+    for row in items:
+        value = ""
+        label = ""
+        if isinstance(row, dict):
+            value = str(
+                row.get("value")
+                or row.get("VALUE")
+                or row.get("id")
+                or row.get("ID")
+                or row.get("statusId")
+                or row.get("STATUS_ID")
+                or ""
+            ).strip()
+            label = _extract_localized_label(
+                row.get("label")
+                or row.get("LABEL")
+                or row.get("name")
+                or row.get("NAME")
+                or row.get("title")
+                or row.get("TITLE")
+                or row.get("VALUE")
+            )
+        elif row is not None:
+            value = str(row).strip()
+            label = value
+        if not value:
+            continue
+        if not label:
+            label = value
+        key = f"{value}|{label}"
+        if key in seen:
+            continue
+        seen.add(key)
+        out.append({"value": value, "label": label})
+    return out
+
+
+def _extract_enum_options_from_meta(meta: Any) -> list[dict[str, str]]:
+    """
+    Достать справочник значений из метаданных поля (items/enum/values/list).
+    """
+    if not isinstance(meta, dict):
+        return []
+    for key in (
+        "items", "ITEMS",
+        "enum", "ENUM",
+        "values", "VALUES",
+        "list", "LIST",
+        "options", "OPTIONS",
+    ):
+        value = _pick_row_value(meta, key)
+        if isinstance(value, list):
+            normalized = _normalize_option_rows(value)
+            if normalized:
+                return normalized
+    return []
+
+
+def _extract_userfield_options(row: Any) -> list[dict[str, str]]:
+    """
+    Варианты значений UF-поля (enumeration), если они пришли в userfield.list.
+    """
+    if not isinstance(row, dict):
+        return []
+    value = _pick_row_value(row, "LIST", "list", "items", "ITEMS", "ENUM", "enum")
+    if isinstance(value, list):
+        return _normalize_option_rows(value)
+    return []
+
+
+def _find_userfield_row_by_code(rows: Any, code: str) -> dict[str, Any]:
+    if not isinstance(rows, list):
+        return {}
+    norm = _normalize_uf_code(code)
+    for row in rows:
+        if not isinstance(row, dict):
+            continue
+        row_code = _normalize_uf_code(_pick_row_value(row, "FIELD_NAME", "fieldName", "field_name"))
+        if row_code and row_code == norm:
+            return row
+    return {}
+
+
+def _extract_status_options(rows: Any) -> list[dict[str, str]]:
+    if not isinstance(rows, list):
+        return []
+    out: list[dict[str, str]] = []
+    for row in rows:
+        if not isinstance(row, dict):
+            continue
+        value = str(
+            row.get("STATUS_ID")
+            or row.get("statusId")
+            or row.get("ID")
+            or row.get("id")
+            or ""
+        ).strip()
+        label = _extract_localized_label(
+            row.get("NAME")
+            or row.get("name")
+            or row.get("TITLE")
+            or row.get("title")
+            or value
+        )
+        if value and label:
+            out.append({"value": value, "label": label})
+    return _normalize_option_rows(out)
+
+
+def _guess_status_entity_id(entity: str, field_code: str, meta: Any) -> str:
+    """
+    Попытаться определить ENTITY_ID для crm.status.list.
+    """
+    if not isinstance(meta, dict):
+        meta = {}
+    code = str(field_code or "").strip().upper()
+    status_id = str(
+        _pick_row_value(
+            meta,
+            "statusType",
+            "STATUS_TYPE",
+            "statusTypeId",
+            "STATUS_TYPE_ID",
+            "statusEntityId",
+            "STATUS_ENTITY_ID",
+            "entityId",
+            "ENTITY_ID",
+        ) or ""
+    ).strip().upper()
+    if status_id:
+        return status_id
+
+    fallback_map = {
+        "deal": {
+            "STAGE_ID": "DEAL_STAGE",
+            "TYPE_ID": "DEAL_TYPE",
+            "SOURCE_ID": "SOURCE",
+            "EVENT_ID": "EVENT_TYPE",
+        },
+        "lead": {
+            "STATUS_ID": "STATUS",
+            "SOURCE_ID": "SOURCE",
+            "HONORIFIC": "HONORIFIC",
+        },
+        "contact": {
+            "TYPE_ID": "CONTACT_TYPE",
+            "SOURCE_ID": "SOURCE",
+            "HONORIFIC": "HONORIFIC",
+        },
+        "company": {
+            "TYPE_ID": "COMPANY_TYPE",
+            "SOURCE_ID": "SOURCE",
+            "INDUSTRY": "INDUSTRY",
+            "EMPLOYEES": "EMPLOYEES",
+            "HONORIFIC": "HONORIFIC",
+        },
+    }
+    return str(fallback_map.get(str(entity or "").lower(), {}).get(code, "") or "").strip().upper()
 
 
 async def _call_bitrix_list_all(client, method: str, params: dict | None = None) -> list[dict]:
@@ -1064,17 +1324,24 @@ async def _load_crm_entity_fields(
         legacy_code = _to_legacy_field_code(code)
         if not legacy_code:
             continue
-        # Для UF_* используем каноничные коды из legacy crm.*.fields.
-        # В crm.item.fields коды UF приходят в camelCase и при конвертации могут
-        # давать некорректные артефакты вроде UF_CRM_683_ED_... — такие ключи
-        # недопустимы для дальнейшего crm.*.get маппинга.
-        if legacy_code.startswith("UF_") and legacy_code not in legacy_fields:
-            continue
+        # Для UF_* используем только реальные коды из legacy crm.*.fields.
+        # Это защищает от артефактов конвертации camelCase из crm.item.fields,
+        # которые иногда дают несуществующие варианты кода.
+        if legacy_code.startswith("UF_"):
+            legacy_code = _match_legacy_uf_code(legacy_code, legacy_fields)
+            if not legacy_code:
+                continue
         if not isinstance(meta, dict):
             meta = {}
         existing = item_fields_legacy.get(legacy_code)
         # Предпочитаем запись, где есть заголовок
-        if not existing or (not existing.get("title") and meta.get("title")):
+        if (
+            not existing
+            or (
+                _is_code_like_title(_extract_field_title(existing, legacy_code), legacy_code)
+                and not _is_code_like_title(_extract_field_title(meta, legacy_code), legacy_code)
+            )
+        ):
             item_fields_legacy[legacy_code] = dict(meta)
 
     merged = {str(k): dict(v) for k, v in legacy_fields.items() if isinstance(v, dict)}
@@ -1082,11 +1349,7 @@ async def _load_crm_entity_fields(
         if code not in merged:
             merged[code] = dict(meta)
             continue
-        # Обогащаем legacy метаданные (title/type), не ломая обратную совместимость по ключам
-        if not merged[code].get("title") and meta.get("title"):
-            merged[code]["title"] = meta.get("title")
-        if not merged[code].get("type") and meta.get("type"):
-            merged[code]["type"] = meta.get("type")
+        _enrich_field_meta(merged[code], meta, code)
 
     log.info(
         "crm fields merged: %s legacy=%d item=%d merged=%d",
@@ -1103,18 +1366,14 @@ def _to_legacy_field_code(code: Any) -> str:
     text = str(code or "").strip()
     if not text:
         return ""
-    if text.upper() == text:
-        return text
 
-    # Спец-случай для кастомных полей UF_CRM_* из crm.item.fields (обычно ufCrmXxx).
-    # Нельзя разбивать буквенно-числовой хвост доп. "_", иначе получается
-    # несуществующий код поля в crm.*.get.
-    if text.startswith("ufCrm") or text.startswith("UFCRM") or text.startswith("ufcrm"):
-        tail = text[5:]
-        tail = re.sub(r"[^A-Za-z0-9_]", "", tail)
-        if not tail:
-            return "UF_CRM"
-        return f"UF_CRM_{tail.upper()}"
+    if re.match(r"(?i)^uf(?:_|)?crm", text) or text.upper().startswith("UF_"):
+        return _canonicalize_uf_code(text)
+
+    if text.upper() == text:
+        text = text.replace("-", "_")
+        text = re.sub(r"_+", "_", text).strip("_")
+        return text.upper()
 
     # camelCase -> snake_case
     snake = re.sub(r"([a-z0-9])([A-Z])", r"\1_\2", text)
@@ -1124,6 +1383,99 @@ def _to_legacy_field_code(code: Any) -> str:
     snake = snake.replace("-", "_")
     snake = re.sub(r"_+", "_", snake).strip("_")
     return snake.upper()
+
+
+def _canonicalize_uf_code(code: Any) -> str:
+    """
+    Нормализовать любой вариант UF-кода к каноничному UPPER_SNAKE.
+
+    Примеры:
+      ufCrm1752072396863  -> UF_CRM_1752072396863
+      UF_CRM_abcDef       -> UF_CRM_ABCDEF
+      uf_crm_chat         -> UF_CRM_CHAT
+    """
+    text = str(code or "").strip()
+    if not text:
+        return ""
+    text = text.replace("-", "_")
+
+    m = re.match(r"(?i)^uf(?:_|)?crm(?:_|)?(.*)$", text)
+    if m:
+        tail = re.sub(r"[^A-Za-z0-9_]", "", m.group(1) or "")
+        tail = re.sub(r"_+", "_", tail).strip("_")
+        return f"UF_CRM_{tail.upper()}" if tail else "UF_CRM"
+
+    if text.upper().startswith("UF_"):
+        tail = re.sub(r"[^A-Za-z0-9_]", "", text[3:])
+        tail = re.sub(r"_+", "_", tail).strip("_")
+        return f"UF_{tail.upper()}" if tail else "UF"
+
+    return text.upper()
+
+
+def _compact_code(value: Any) -> str:
+    return re.sub(r"[^A-Z0-9]", "", str(value or "").upper())
+
+
+def _match_legacy_uf_code(code: str, legacy_fields: dict[str, dict]) -> str:
+    """
+    Сопоставить UF-код из crm.item.fields с реальным кодом из legacy crm.*.fields.
+    Возвращает пустую строку, если соответствие не найдено.
+    """
+    norm = _canonicalize_uf_code(code)
+    if not norm.startswith("UF_"):
+        return norm
+    if norm in legacy_fields:
+        return norm
+
+    compact = _compact_code(norm)
+    if not compact:
+        return ""
+
+    for legacy_code in legacy_fields.keys():
+        lc = str(legacy_code)
+        if not lc.upper().startswith("UF_"):
+            continue
+        if _compact_code(lc) == compact:
+            return lc
+    return ""
+
+
+def _enrich_field_meta(base: dict[str, Any], extra: dict[str, Any], field_code: str) -> None:
+    """
+    Аккуратно обогатить legacy-метаданные полей данными из crm.item.fields:
+    - копируем отсутствующие ключи;
+    - переносим title, если в legacy он кодоподобный, а в extra человекочитаемый;
+    - добираем type/userType/isMultiple при их отсутствии в legacy.
+    """
+    if not isinstance(base, dict) or not isinstance(extra, dict):
+        return
+
+    for key, value in extra.items():
+        if key not in base or base.get(key) in (None, "", [], {}):
+            base[key] = value
+
+    base_title = _extract_field_title(base, field_code)
+    extra_title = _extract_field_title(extra, field_code)
+    if (
+        extra_title
+        and not _is_code_like_title(extra_title, field_code)
+        and (not base_title or _is_code_like_title(base_title, field_code))
+    ):
+        base["title"] = extra_title
+
+    if not _extract_field_type(base):
+        extra_type = _extract_field_type(extra)
+        if extra_type:
+            base["type"] = extra_type
+
+    if not _extract_field_user_type_id(base):
+        extra_ut = _extract_field_user_type_id(extra)
+        if extra_ut:
+            base["userType"] = extra_ut
+
+    if not _extract_field_is_multiple(base) and _extract_field_is_multiple(extra):
+        base["isMultiple"] = True
 
 
 def _build_userfield_meta_map(payload: Any) -> dict[str, dict[str, Any]]:

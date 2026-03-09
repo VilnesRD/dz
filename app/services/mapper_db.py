@@ -35,6 +35,7 @@ def build_fill_payload(
     deal: dict,
     contact: dict | None,
     company: dict | None,
+    lead: dict | None = None,
 ) -> dict[str, Any]:
     """
     Построить payload для fillDocz на основе маппингов из БД.
@@ -44,6 +45,7 @@ def build_fill_payload(
     """
     sources = {
         "deal":    deal or {},
+        "lead":    lead or {},
         "contact": contact or {},
         "company": company or {},
         "doc":     {},  # уже вычисленные переменные Doczilla (по variable_id)
@@ -167,10 +169,30 @@ def _resolve_selector(m: FieldMapping, sources: dict) -> bool | None:
 
     field_raw = _get_field_raw(cfg.get("source_field", ""), sources)
     field_tokens = _tokenize_values(field_raw)
-    options   = cfg.get("options", {})             # {field_value: condition_id|[condition_id,...]}
-    this_cid  = str(cfg.get("this_condition_id", m.variable_id))
+    this_cid = str(cfg.get("this_condition_id", m.variable_id))
 
     matched_ids: set[str] = set()
+
+    # v2: rules = [{"operator":"eq|neq|in|not_in|contains|not_contains|filled|empty","value":"...","values":[...],"targets":[...]}]
+    rules = cfg.get("rules")
+    if isinstance(rules, list):
+        for rule in rules:
+            if not isinstance(rule, dict):
+                continue
+            targets = _extract_condition_ids(
+                rule.get("targets")
+                or rule.get("condition_ids")
+                or rule.get("condition_id")
+                or rule.get("set_true")
+                or rule.get("true_ids")
+            )
+            if not targets:
+                continue
+            if _selector_rule_matches(rule, field_raw, field_tokens):
+                matched_ids.update(targets)
+
+    # v1 fallback: options map
+    options = cfg.get("options", {})  # {field_value: condition_id|[condition_id,...]}
     if isinstance(options, dict):
         for expected, target in options.items():
             expected_tokens = _tokenize_values(expected)
@@ -309,6 +331,39 @@ def _extract_condition_ids(value: Any) -> set[str]:
                 ids.update(_extract_condition_ids(value.get(key)))
         return ids
     return ids
+
+
+def _selector_rule_matches(rule: dict[str, Any], field_raw: Any, field_tokens: set[str]) -> bool:
+    op = str(rule.get("operator") or rule.get("op") or "eq").strip().lower()
+
+    if op in {"filled", "not_empty"}:
+        return _is_non_empty(field_raw)
+    if op in {"empty", "is_empty"}:
+        return not _is_non_empty(field_raw)
+
+    raw_values = rule.get("values")
+    if raw_values is None:
+        raw_values = rule.get("value")
+    expected_tokens = _tokenize_values(raw_values)
+
+    if op in {"eq", "="}:
+        return bool(expected_tokens) and bool(expected_tokens.intersection(field_tokens))
+    if op in {"neq", "!=", "<>"}:
+        return bool(expected_tokens) and not bool(expected_tokens.intersection(field_tokens))
+    if op == "in":
+        return bool(expected_tokens) and bool(expected_tokens.intersection(field_tokens))
+    if op == "not_in":
+        return bool(expected_tokens) and not bool(expected_tokens.intersection(field_tokens))
+
+    raw_text = _stringify_value(field_raw).lower()
+    needle = _stringify_value(rule.get("value")).strip().lower()
+    if op == "contains":
+        return bool(needle) and needle in raw_text
+    if op == "not_contains":
+        return bool(needle) and needle not in raw_text
+
+    # Неизвестный оператор трактуем как eq для обратной совместимости
+    return bool(expected_tokens) and bool(expected_tokens.intersection(field_tokens))
 
 
 def _is_non_empty(value: Any) -> bool:

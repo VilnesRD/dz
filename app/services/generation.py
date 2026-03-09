@@ -46,20 +46,68 @@ class DocumentGenerationService:
         self.bitrix = bitrix
         self.doczilla = doczilla
 
-    async def generate_for_deal(self, deal_id: str, template_key: str) -> GenerationResult:
-        """
-        Полный цикл генерации документа для сделки.
-        Шаблон и маппинг берутся из SQLite.
-        """
-        # ── 1. Загрузить шаблон из БД ─────────────────────────────────────────
+    @staticmethod
+    def _normalize_result_mode(value: str | None) -> str:
+        mode = str(value or "").strip().lower()
+        return mode if mode in {"link", "pdf", "both"} else "both"
+
+    @staticmethod
+    def _count_non_empty_payload(payload: dict[str, object]) -> int:
+        return sum(1 for v in payload.values() if v not in (None, "", [], {}, ()))
+
+    @staticmethod
+    def _build_doc_link(doc_id: str, doc_link_code: str) -> str:
+        base = settings.DOCZILLA_BASE_URL.rstrip("/")
+        if doc_link_code:
+            if doc_link_code.startswith("http://") or doc_link_code.startswith("https://"):
+                return doc_link_code
+            return f"{base}/#{doc_link_code}"
+        return f"{base}/workspace#file/{doc_id}"
+
+    @staticmethod
+    def _load_template(template_key: str):
         with SessionLocal() as db:
             template = repo.get_template_by_key(db, template_key)
             if not template:
                 raise KeyError(f"Шаблон '{template_key}' не найден в базе данных")
             if not template.active:
                 raise ValueError(f"Шаблон '{template_key}' отключён")
-            # Загружаем маппинги пока сессия открыта
             _ = template.mappings  # eager load
+            return template
+
+    async def _create_and_fill_doc(
+        self,
+        *,
+        template,
+        payload: dict[str, object],
+        doc_name: str,
+        log_prefix: str,
+    ) -> tuple[str, str]:
+        logger.info("%s: создаём документ в Doczilla", log_prefix)
+        doc = await self.doczilla.create_docz(
+            template_file_id=template.doczilla_file_id,
+            template_link=template.doczilla_link,
+            name=doc_name,
+            folder_id=template.doczilla_folder_id,
+        )
+        doc_link_code = ""
+        if isinstance(doc, dict):
+            doc_id = str(doc.get("id") or doc.get("recordId") or "").strip()
+            doc_link_code = str(doc.get("link") or "").strip()
+        else:
+            doc_id = str(doc).strip()
+        if not doc_id:
+            raise RuntimeError("Doczilla createDocz не вернул ID документа")
+        logger.info("%s: doc_id=%s link_code=%s, заполняем переменные", log_prefix, doc_id, doc_link_code or "-")
+        await self.doczilla.fill_docz(doc_id, payload)
+        return doc_id, self._build_doc_link(doc_id, doc_link_code)
+
+    async def generate_for_deal(self, deal_id: str, template_key: str) -> GenerationResult:
+        """
+        Полный цикл генерации документа для сделки.
+        Шаблон и маппинг берутся из SQLite.
+        """
+        template = self._load_template(template_key)
 
         # ── 2. Данные из Б24 ──────────────────────────────────────────────────
         logger.info("deal=%s шаблон=%s: получаем данные из Б24", deal_id, template_key)
@@ -85,49 +133,22 @@ class DocumentGenerationService:
                 logger.warning("deal=%s: не удалось загрузить компанию: %s", deal_id, e)
 
         # ── 3. Маппинг полей ──────────────────────────────────────────────────
-        payload = build_fill_payload(template, deal, contact, company)
+        payload = build_fill_payload(template, deal, contact, company, lead=None)
         doc_name = build_doc_name(template, deal)
         warnings: list[str] = []
-        non_empty = sum(
-            1 for v in payload.values()
-            if v not in (None, "", [], {}, ())
-        )
+        non_empty = self._count_non_empty_payload(payload)
         logger.info("deal=%s: payload %d переменных (непустых=%d)", deal_id, len(payload), non_empty)
 
         # ── 4. Создать и заполнить документ в Doczilla ────────────────────────
-        logger.info("deal=%s: создаём документ в Doczilla", deal_id)
-        doc = await self.doczilla.create_docz(
-            template_file_id=template.doczilla_file_id,
-            template_link=template.doczilla_link,
-            name=doc_name,
-            folder_id=template.doczilla_folder_id,
+        doc_id, doc_link = await self._create_and_fill_doc(
+            template=template,
+            payload=payload,
+            doc_name=doc_name,
+            log_prefix=f"deal={deal_id}",
         )
-        doc_link_code = ""
-        if isinstance(doc, dict):
-            doc_id = str(doc.get("id") or doc.get("recordId") or "").strip()
-            doc_link_code = str(doc.get("link") or "").strip()
-        else:
-            doc_id = str(doc).strip()
-        if not doc_id:
-            raise RuntimeError("Doczilla createDocz не вернул ID документа")
-        logger.info("deal=%s: doc_id=%s link_code=%s, заполняем переменные", deal_id, doc_id, doc_link_code or "-")
-
-        await self.doczilla.fill_docz(doc_id, payload)
-
-        # ── 5. Ссылка на документ ─────────────────────────────────────────────
-        base = settings.DOCZILLA_BASE_URL.rstrip("/")
-        if doc_link_code:
-            if doc_link_code.startswith("http://") or doc_link_code.startswith("https://"):
-                doc_link = doc_link_code
-            else:
-                doc_link = f"{base}/#{doc_link_code}"
-        else:
-            doc_link = f"{base}/workspace#file/{doc_id}"
 
         # ── 6. Записать результат в Б24 ───────────────────────────────────────
-        result_mode = str(getattr(template, "bitrix_result_mode", "") or "both").strip().lower()
-        if result_mode not in {"link", "pdf", "both"}:
-            result_mode = "both"
+        result_mode = self._normalize_result_mode(getattr(template, "bitrix_result_mode", "both"))
         save_link = result_mode in {"link", "both"}
         save_pdf = result_mode in {"pdf", "both"}
 
@@ -185,6 +206,59 @@ class DocumentGenerationService:
             result_mode=result_mode,
             save_link=save_link,
             save_pdf=save_pdf,
+            warnings=warnings,
+        )
+
+    async def generate_for_lead(self, lead_id: str, template_key: str) -> GenerationResult:
+        """
+        Генерация документа для лида.
+        Источник маппинга: lead.*, contact.*, company.*, doc.*.
+        """
+        template = self._load_template(template_key)
+        logger.info("lead=%s шаблон=%s: получаем данные из Б24", lead_id, template_key)
+        lead = await self.bitrix.get_lead(lead_id)
+
+        contact = None
+        company = None
+
+        contact_id = lead.get("CONTACT_ID")
+        if contact_id:
+            try:
+                contact = await self.bitrix.get_contact(contact_id)
+            except Exception as e:
+                logger.warning("lead=%s: не удалось загрузить контакт: %s", lead_id, e)
+
+        company_id = lead.get("COMPANY_ID")
+        if company_id:
+            try:
+                company = await self.bitrix.get_company(company_id)
+            except Exception as e:
+                logger.warning("lead=%s: не удалось загрузить компанию: %s", lead_id, e)
+
+        payload = build_fill_payload(template, deal={}, contact=contact, company=company, lead=lead)
+        doc_name = build_doc_name(template, lead)
+        warnings: list[str] = []
+        non_empty = self._count_non_empty_payload(payload)
+        logger.info("lead=%s: payload %d переменных (непустых=%d)", lead_id, len(payload), non_empty)
+
+        doc_id, doc_link = await self._create_and_fill_doc(
+            template=template,
+            payload=payload,
+            doc_name=doc_name,
+            log_prefix=f"lead={lead_id}",
+        )
+
+        # Для сценария USERFIELD_TYPE возвращаем результат в UI,
+        # который сам выставляет значение свойства через BX24.placement.call('setValue').
+        logger.info("lead=%s: ✅ готово, doc_id=%s", lead_id, doc_id)
+        return GenerationResult(
+            doc_id=doc_id,
+            doc_link=doc_link,
+            doc_name=doc_name,
+            template_id=template.id,
+            result_mode="link",
+            save_link=False,
+            save_pdf=False,
             warnings=warnings,
         )
 

@@ -1,0 +1,255 @@
+<!doctype html>
+<html lang="ru">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Doczilla Lead Field</title>
+  <style>
+    :root{
+      --bg:#f7f8fc;--card:#fff;--border:#dfe3ef;--text:#2d3445;--muted:#6f7991;
+      --accent:#ff4d7e;--accent2:#ff6a96;--ok:#16a34a;--err:#dc2626;
+      --radius:10px;--font:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,Arial,sans-serif;
+    }
+    *{box-sizing:border-box}
+    html,body{margin:0;padding:0;background:var(--bg);color:var(--text);font-family:var(--font);font-size:14px}
+    .wrap{padding:10px}
+    .card{background:var(--card);border:1px solid var(--border);border-radius:var(--radius);padding:12px}
+    .head{display:flex;align-items:center;gap:8px;margin-bottom:10px}
+    .logo{width:18px;height:18px;border-radius:4px;background:linear-gradient(135deg,#ff4d7e,#8f67ff)}
+    .ttl{font-size:14px;font-weight:700}
+    .sub{font-size:12px;color:var(--muted);margin-top:1px}
+    .line{font-size:12px;color:var(--muted);margin-bottom:8px}
+    select,button{
+      width:100%;border:1px solid var(--border);border-radius:8px;padding:8px 10px;font-size:14px;
+    }
+    select{background:#fff;color:var(--text)}
+    button{margin-top:8px;border:none;background:linear-gradient(90deg,var(--accent),var(--accent2));color:#fff;font-weight:700;cursor:pointer}
+    button:disabled{opacity:.45;cursor:not-allowed}
+    .msg{margin-top:8px;font-size:12px;line-height:1.45}
+    .msg.ok{color:var(--ok)}
+    .msg.err{color:var(--err)}
+    .row{display:flex;gap:8px;align-items:center}
+    .mono{font-family:ui-monospace,Menlo,Consolas,monospace}
+    .current{margin-top:8px;padding:8px;border:1px dashed var(--border);border-radius:8px;font-size:12px;background:#fbfcff}
+    a{color:#2563eb;text-decoration:none}
+  </style>
+  <script src="//api.bitrix24.com/api/v1/"></script>
+</head>
+<body>
+  <div class="wrap">
+    <div class="card">
+      <div class="head">
+        <div class="logo"></div>
+        <div>
+          <div class="ttl">Doczilla PRO</div>
+          <div class="sub">Генерация документа для лида</div>
+        </div>
+      </div>
+      <div class="line" id="ctxLine">Лид: —</div>
+
+      <select id="templateSelect">
+        <option value="">— выберите шаблон —</option>
+      </select>
+      <button id="generateBtn" type="button" disabled>Создать документ</button>
+
+      <div class="msg" id="msg"></div>
+      <div class="current" id="currentValue" style="display:none"></div>
+    </div>
+  </div>
+
+<script>
+const API_BASE = '';
+const state = {
+  leadId: '',
+  domain: '',
+  authId: '',
+  mode: 'edit',
+  value: '',
+};
+
+const els = {
+  ctx: document.getElementById('ctxLine'),
+  sel: document.getElementById('templateSelect'),
+  btn: document.getElementById('generateBtn'),
+  msg: document.getElementById('msg'),
+  current: document.getElementById('currentValue'),
+};
+
+function setMessage(text, type = '') {
+  els.msg.className = `msg ${type}`.trim();
+  els.msg.textContent = text || '';
+}
+
+function safeJsonParse(v) {
+  if (typeof v !== 'string') return v || {};
+  try { return JSON.parse(v); } catch { return {}; }
+}
+
+function firstNonEmpty(...vals) {
+  for (const v of vals) {
+    if (v === null || v === undefined) continue;
+    const s = String(v).trim();
+    if (s) return s;
+  }
+  return '';
+}
+
+function getQueryParams() {
+  const p = new URLSearchParams(window.location.search);
+  return Object.fromEntries(p.entries());
+}
+
+function bxGetAuth() {
+  if (!window.BX24 || typeof BX24.getAuth !== 'function') return {};
+  try { return BX24.getAuth() || {}; } catch { return {}; }
+}
+
+function bxPlacementInfo() {
+  return new Promise((resolve) => {
+    if (!window.BX24 || !BX24.placement || typeof BX24.placement.info !== 'function') {
+      resolve({});
+      return;
+    }
+    BX24.placement.info((info) => resolve(info || {}));
+  });
+}
+
+function bxSetValue(value) {
+  return new Promise((resolve) => {
+    if (!window.BX24 || !BX24.placement || typeof BX24.placement.call !== 'function') {
+      resolve(false);
+      return;
+    }
+    BX24.placement.call('setValue', value, () => resolve(true));
+  });
+}
+
+async function loadTemplates() {
+  const r = await fetch(`${API_BASE}/api/widget-config`);
+  const data = await r.json();
+  const list = Array.isArray(data?.templates) ? data.templates : [];
+  for (const t of list) {
+    const o = document.createElement('option');
+    o.value = String(t.key || '');
+    o.textContent = String(t.name || t.key || '');
+    els.sel.appendChild(o);
+  }
+}
+
+function updateUiByMode() {
+  const canEdit = String(state.mode || '').toLowerCase() === 'edit';
+  els.sel.disabled = !canEdit;
+  els.btn.disabled = !canEdit || !state.leadId || !els.sel.value;
+
+  if (!canEdit) {
+    els.current.style.display = 'block';
+    const current = String(state.value || '').trim();
+    if (current) {
+      const escaped = current
+        .replace(/&/g, '&amp;')
+        .replace(/</g, '&lt;')
+        .replace(/>/g, '&gt;');
+      const isLink = /^https?:\/\//i.test(current);
+      els.current.innerHTML = isLink
+        ? `Текущее значение: <a href="${escaped}" target="_blank" rel="noopener">${escaped}</a>`
+        : `Текущее значение: <span class="mono">${escaped}</span>`;
+    } else {
+      els.current.textContent = 'Значение поля не задано.';
+    }
+  } else {
+    els.current.style.display = 'none';
+  }
+}
+
+async function generate() {
+  const templateKey = els.sel.value;
+  if (!templateKey || !state.leadId) return;
+
+  els.btn.disabled = true;
+  setMessage('Генерируем документ…');
+  try {
+    const payload = {
+      entity_type: 'lead',
+      entity_id: String(state.leadId),
+      template_key: String(templateKey),
+      bitrix_domain: state.domain || undefined,
+      bitrix_token: state.authId || undefined,
+    };
+    const r = await fetch(`${API_BASE}/api/generate`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(payload),
+    });
+    const data = await r.json();
+    if (!r.ok || data?.status !== 'success') {
+      throw new Error(String(data?.detail || data?.error || `HTTP ${r.status}`));
+    }
+
+    const link = String(data.doc_link || '').trim();
+    if (!link) throw new Error('Сервис не вернул ссылку на документ');
+
+    await bxSetValue(link);
+    setMessage(`Ссылка сохранена в поле лида. ${data.doc_name || ''}`.trim(), 'ok');
+
+    const escaped = link
+      .replace(/&/g, '&amp;')
+      .replace(/</g, '&lt;')
+      .replace(/>/g, '&gt;');
+    els.current.style.display = 'block';
+    els.current.innerHTML = `Последний результат: <a href="${escaped}" target="_blank" rel="noopener">${escaped}</a>`;
+
+    setTimeout(() => {
+      els.sel.value = '';
+      setMessage('Готово. Можно выбрать другой шаблон.');
+      updateUiByMode();
+    }, 1200);
+  } catch (e) {
+    setMessage(e?.message || 'Ошибка генерации', 'err');
+    updateUiByMode();
+  }
+}
+
+async function init() {
+  const qp = getQueryParams();
+  const auth = bxGetAuth();
+  const placement = await bxPlacementInfo();
+  const opts = safeJsonParse(
+    firstNonEmpty(
+      placement.options,
+      qp.PLACEMENT_OPTIONS
+    )
+  );
+
+  state.leadId = firstNonEmpty(
+    opts?.ENTITY_VALUE_ID,
+    opts?.entityValueId,
+    opts?.ID,
+    qp.LEAD_ID,
+    qp.ID
+  );
+  state.mode = String(firstNonEmpty(opts?.MODE, qp.MODE, 'edit')).toLowerCase();
+  state.value = firstNonEmpty(opts?.VALUE, qp.VALUE);
+  state.domain = firstNonEmpty(auth?.domain, qp.DOMAIN);
+  state.authId = firstNonEmpty(auth?.access_token, auth?.AUTH_ID);
+
+  els.ctx.textContent = `Лид: ${state.leadId ? '#' + state.leadId : '—'}`;
+
+  try {
+    await loadTemplates();
+  } catch (e) {
+    setMessage('Не удалось загрузить шаблоны', 'err');
+  }
+  updateUiByMode();
+}
+
+els.sel.addEventListener('change', updateUiByMode);
+els.btn.addEventListener('click', generate);
+
+if (window.BX24 && typeof BX24.init === 'function') {
+  BX24.init(() => { init(); });
+} else {
+  init();
+}
+</script>
+</body>
+</html>
