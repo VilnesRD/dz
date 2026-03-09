@@ -49,9 +49,10 @@ async def install_post(request: Request):
     Обмениваем code на access_token + refresh_token, сохраняем в БД,
     регистрируем placement CRM_DEAL_TOOLBAR.
     """
-    form = dict(await request.form())
-    code   = form.get("code")
-    domain = form.get("DOMAIN") or form.get("domain")
+    params = dict(request.query_params)
+    form   = dict(await request.form())
+    code   = params.get("code") or form.get("code")
+    domain = params.get("DOMAIN") or params.get("domain") or form.get("DOMAIN") or form.get("domain")
 
     logger.info("install POST: domain=%s code=%s", domain, bool(code))
 
