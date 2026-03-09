@@ -837,19 +837,46 @@ function app() { return {
     let q=val.toLowerCase();
     const brace=q.match(/\{([^}]*)$/);
     if(brace) q=brace[1];
-    this.acRes=q
-      ?this.b24Fields.filter(f=>f.path.toLowerCase().includes(q)||f.label.toLowerCase().includes(q)).slice(0,12)
-      :this.defaultAcResults();
+    q=q.trim();
+    if(!q){
+      this.acRes=this.defaultAcResults();
+      return;
+    }
+    const ranked=this.rankFieldResults(q);
+    const isCustomQuery=q.includes('uf_')||q.includes('ufcrm')||q.includes('кастом')||q.includes('пользователь');
+    if(isCustomQuery){
+      const customOnly=ranked.filter(f=>f.path.toLowerCase().includes('.uf_'));
+      this.acRes=(customOnly.length?customOnly:ranked).slice(0,80);
+      return;
+    }
+    this.acRes=ranked.slice(0,80);
+  },
+  rankFieldResults(q){
+    const starts=[], contains=[];
+    this.b24Fields.forEach(f=>{
+      const p=f.path.toLowerCase(), l=f.label.toLowerCase();
+      if(p.startsWith(q)||l.startsWith(q)) starts.push(f);
+      else if(p.includes(q)||l.includes(q)) contains.push(f);
+    });
+    return [...starts,...contains];
   },
   defaultAcResults(){
-    const byPrefix=(p)=>this.b24Fields.filter(f=>f.path.startsWith(p));
-    const deal=byPrefix('deal.').slice(0,4);
-    const contact=byPrefix('contact.').slice(0,4);
-    const company=byPrefix('company.').slice(0,4);
+    const byPrefix=(p)=>this.b24Fields.filter(f=>f.path.toLowerCase().startsWith(p));
+    const split=(arr)=>{
+      const custom=arr.filter(f=>f.path.toLowerCase().includes('.uf_'));
+      const base=arr.filter(f=>!f.path.toLowerCase().includes('.uf_'));
+      return {custom,base};
+    };
+    const d=split(byPrefix('deal.'));
+    const c=split(byPrefix('contact.'));
+    const co=split(byPrefix('company.'));
+    const deal=[...d.custom.slice(0,3),...d.base.slice(0,5)];
+    const contact=[...c.custom.slice(0,2),...c.base.slice(0,4)];
+    const company=[...co.custom.slice(0,2),...co.base.slice(0,4)];
     const used=new Set([...deal,...contact,...company].map(f=>f.path));
     const other=this.b24Fields.filter(f=>!used.has(f.path)).slice(0,4);
     const mixed=[...deal,...contact,...company,...other];
-    return mixed.length?mixed:this.b24Fields.slice(0,12);
+    return mixed.length?mixed:this.b24Fields.slice(0,20);
   },
   acDown(){this.acIdx=Math.min(this.acIdx+1,this.acRes.length-1);},
   acUp(){this.acIdx=Math.max(this.acIdx-1,-1);},
@@ -877,9 +904,13 @@ function app() { return {
       const r=await this.req('GET','/admin/bitrix/fields');
       this.b24Fields=Array.isArray(r.fields)?r.fields:[];
       const stats=r?.meta?.stats||{};
+      const custom=r?.meta?.custom_stats||{};
       const errs=Array.isArray(r?.meta?.errors)?r.meta.errors:[];
       if(this.editTmpl&&errs.length){
         this.mAlert=`Поля Б24 загружены частично (deal:${stats.deal||0}, contact:${stats.contact||0}, company:${stats.company||0}).`;
+        this.mAlertT='error';
+      }else if(this.editTmpl && (custom.deal===0 && custom.contact===0 && custom.company===0)){
+        this.mAlert='Кастомные поля UF_* не обнаружены в ответе API. Проверьте права CRM у пользователя, который установил приложение.';
         this.mAlertT='error';
       }
     }

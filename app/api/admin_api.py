@@ -442,6 +442,7 @@ async def get_bitrix_fields(
 
     client = BitrixClient(domain=domain, access_token=auth_id)
     stats = {"deal": 0, "contact": 0, "company": 0}
+    custom_stats = {"deal": 0, "contact": 0, "company": 0}
     errors: list[str] = []
     try:
         # Поля сделки
@@ -454,6 +455,7 @@ async def get_bitrix_fields(
                     "type": finfo.get("type", ""),
                 })
             stats["deal"] = len(deal_fields)
+            custom_stats["deal"] = len([k for k in deal_fields.keys() if str(k).upper().startswith("UF_")])
         except Exception as e:
             log.warning("crm.deal.fields: %s", e)
             errors.append(f"deal: {e}")
@@ -468,6 +470,7 @@ async def get_bitrix_fields(
                     "type": finfo.get("type", ""),
                 })
             stats["contact"] = len(contact_fields)
+            custom_stats["contact"] = len([k for k in contact_fields.keys() if str(k).upper().startswith("UF_")])
         except Exception as e:
             log.warning("crm.contact.fields: %s", e)
             errors.append(f"contact: {e}")
@@ -482,6 +485,7 @@ async def get_bitrix_fields(
                     "type": finfo.get("type", ""),
                 })
             stats["company"] = len(company_fields)
+            custom_stats["company"] = len([k for k in company_fields.keys() if str(k).upper().startswith("UF_")])
         except Exception as e:
             log.warning("crm.company.fields: %s", e)
             errors.append(f"company: {e}")
@@ -492,10 +496,11 @@ async def get_bitrix_fields(
 
     fields.sort(key=lambda x: x.get("path", ""))
     log.info(
-        "bitrix fields loaded: deal=%d contact=%d company=%d total=%d",
+        "bitrix fields loaded: deal=%d contact=%d company=%d total=%d | custom: deal=%d contact=%d company=%d",
         stats["deal"], stats["contact"], stats["company"], len(fields),
+        custom_stats["deal"], custom_stats["contact"], custom_stats["company"],
     )
-    return {"fields": fields, "meta": {"stats": stats, "errors": errors}}
+    return {"fields": fields, "meta": {"stats": stats, "custom_stats": custom_stats, "errors": errors}}
 
 
 # ── Helpers ───────────────────────────────────────────────────────────────────
