@@ -58,12 +58,33 @@ class DoczillaClient:
         Выполнить запрос к /request.json с автоматическим управлением сессией.
         При ошибке аутентификации — сбрасывает сессию и повторяет один раз.
         """
-        session = await get_session(self._client)
+        try:
+            session = await get_session(self._client)
+        except Exception as e:
+            raise DoczillaError([{"text": f"Doczilla signin error: {e}"}]) from e
         params["session"] = session
 
-        response = await self._client.post(_ENDPOINT, data=params)
-        response.raise_for_status()
-        data = response.json()
+        try:
+            response = await self._client.post(_ENDPOINT, data=params)
+        except httpx.HTTPError as e:
+            raise DoczillaError([{"text": f"Doczilla transport error: {e}"}]) from e
+
+        if response.status_code >= 500 and _retry:
+            logger.warning("Doczilla: серверная ошибка %s, повторяем запрос один раз", response.status_code)
+            await invalidate_session()
+            return await self._request(dict(params), _retry=False)
+
+        try:
+            response.raise_for_status()
+        except httpx.HTTPStatusError as e:
+            body = (response.text or "").strip()
+            raise DoczillaError([{"text": f"Doczilla HTTP {response.status_code}: {body[:240] or e}"}]) from e
+
+        try:
+            data = response.json()
+        except Exception as e:
+            body = (response.text or "").strip()
+            raise DoczillaError([{"text": f"Doczilla invalid JSON: {body[:240]}"}]) from e
 
         if not data.get("success"):
             messages = data.get("info", {}).get("messages", [])
@@ -309,19 +330,28 @@ class DoczillaClient:
         Скачать документ в формате PDF. Метод 3.2.3.
         Возвращает сырые байты PDF.
         """
-        session = await get_session(self._client)
-        response = await self._client.post(
-            _ENDPOINT,
-            data={
-                "request": "pro.doczilla.gpt.workspace.table.Workspace",
-                "action": "content",
-                "method": "get",
-                "file": doc_id,
-                "contentType": "pdf",
-                "session": session,
-            },
-        )
-        response.raise_for_status()
+        try:
+            session = await get_session(self._client)
+        except Exception as e:
+            raise DoczillaError([{"text": f"Doczilla signin error: {e}"}]) from e
+        try:
+            response = await self._client.post(
+                _ENDPOINT,
+                data={
+                    "request": "pro.doczilla.gpt.workspace.table.Workspace",
+                    "action": "content",
+                    "method": "get",
+                    "file": doc_id,
+                    "contentType": "pdf",
+                    "session": session,
+                },
+            )
+            response.raise_for_status()
+        except httpx.HTTPStatusError as e:
+            body = (e.response.text or "").strip() if e.response else ""
+            raise DoczillaError([{"text": f"Doczilla PDF HTTP error: {body[:240] or e}"}]) from e
+        except httpx.HTTPError as e:
+            raise DoczillaError([{"text": f"Doczilla PDF transport error: {e}"}]) from e
 
         content_type = response.headers.get("content-type", "")
         if "application/pdf" not in content_type and "octet-stream" not in content_type:

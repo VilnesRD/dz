@@ -60,16 +60,42 @@ async def invalidate_session() -> None:
 async def _signin(client: httpx.AsyncClient) -> None:
     """Выполнить авторизацию и сохранить токен в кэш."""
     logger.info("Doczilla: выполняем signin...")
-    response = await client.post(
-        f"{settings.DOCZILLA_BASE_URL}/request.json",
-        data={
-            "request": "signin",
-            "login": settings.DOCZILLA_LOGIN,
-            "password": settings.DOCZILLA_PASSWORD,
-        },
-    )
-    response.raise_for_status()
-    data = response.json()
+    last_error: Exception | None = None
+    response = None
+    for attempt in range(3):
+        try:
+            response = await client.post(
+                f"{settings.DOCZILLA_BASE_URL}/request.json",
+                data={
+                    "request": "signin",
+                    "login": settings.DOCZILLA_LOGIN,
+                    "password": settings.DOCZILLA_PASSWORD,
+                },
+            )
+            if response.status_code >= 500:
+                if attempt < 2:
+                    await asyncio.sleep(0.6 * (attempt + 1))
+                    continue
+                response.raise_for_status()
+            response.raise_for_status()
+            break
+        except httpx.HTTPError as e:
+            last_error = e
+            if attempt < 2:
+                await asyncio.sleep(0.6 * (attempt + 1))
+                continue
+            raise RuntimeError(f"Doczilla signin HTTP error: {e}") from e
+
+    if response is None:
+        if last_error:
+            raise RuntimeError(f"Doczilla signin failed: {last_error}")
+        raise RuntimeError("Doczilla signin failed: empty response")
+
+    try:
+        data = response.json()
+    except Exception as e:
+        body = (response.text or "").strip()
+        raise RuntimeError(f"Doczilla signin: некорректный JSON: {body[:240]}") from e
 
     if not data.get("success"):
         messages = data.get("info", {}).get("messages", [])
