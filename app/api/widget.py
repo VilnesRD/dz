@@ -298,6 +298,7 @@ async def widget_config():
     with SessionLocal() as db:
         templates = repo.list_templates(db)
     active = [{"key": t.key, "name": t.name} for t in templates if t.active]
+    logger.info("widget-config: active templates=%d", len(active))
     return {"templates": active}
 
 

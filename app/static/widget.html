@@ -241,7 +241,7 @@
     <div class="step" id="s5"><div class="step-dot"></div> Сохранение ссылки в сделку</div>
   </div>
 
-  <div class="status loading" id="statusLoading">
+  <div class="status" id="statusLoading">
     <div class="spinner"></div>
     <span id="statusLoadingText">Генерируем документ…</span>
   </div>
@@ -261,7 +261,11 @@ const ctx = {
 
 // ── Инициализация ─────────────────────────────────────────────────────────────
 document.addEventListener('DOMContentLoaded', async () => {
-  await initContext();
+  try {
+    await initContext();
+  } catch (e) {
+    console.warn('initContext failed:', e);
+  }
   renderDealPill();
   await loadTemplates();
 
@@ -413,6 +417,8 @@ async function initContext() {
   ctx.dealId = firstNonEmpty(
     params.get('DEAL_ID'),
     params.get('deal_id'),
+    params.get('params[ID]'),
+    params.get('params[id]'),
     params.get('ID'),
     params.get('ENTITY_ID'),
     params.get('ENTITY_VALUE_ID'),
@@ -431,11 +437,11 @@ async function initContext() {
 
   if (!window.BX24) return;
 
-  await bx24Init();
+  await bx24Init(1500);
 
   const [placementInfo, auth] = await Promise.all([
-    bx24PlacementInfo(),
-    bx24Auth(),
+    bx24PlacementInfo(1200),
+    bx24Auth(1200),
   ]);
 
   const optionsFromSdk = safeJsonParse(placementInfo && placementInfo.options);
@@ -501,18 +507,18 @@ function extractDealId(source) {
   );
 }
 
-function bx24Init() {
-  return new Promise(resolve => {
+function bx24Init(timeoutMs = 1500) {
+  return withTimeout(new Promise(resolve => {
     try {
-      BX24.init(resolve);
+      BX24.init(() => resolve());
     } catch (e) {
       resolve();
     }
-  });
+  }), timeoutMs, undefined);
 }
 
-function bx24PlacementInfo() {
-  return new Promise(resolve => {
+function bx24PlacementInfo(timeoutMs = 1200) {
+  return withTimeout(new Promise(resolve => {
     try {
       if (!BX24.placement || typeof BX24.placement.info !== 'function') {
         return resolve({});
@@ -521,17 +527,39 @@ function bx24PlacementInfo() {
     } catch (e) {
       resolve({});
     }
-  });
+  }), timeoutMs, {});
 }
 
-function bx24Auth() {
-  return new Promise(resolve => {
+function bx24Auth(timeoutMs = 1200) {
+  return withTimeout(new Promise(resolve => {
     try {
       if (typeof BX24.getAuth !== 'function') return resolve({});
       BX24.getAuth(auth => resolve(auth || {}));
     } catch (e) {
       resolve({});
     }
+  }), timeoutMs, {});
+}
+
+function withTimeout(promise, timeoutMs, fallback) {
+  return new Promise(resolve => {
+    let settled = false;
+    const timer = setTimeout(() => {
+      if (settled) return;
+      settled = true;
+      resolve(fallback);
+    }, timeoutMs);
+    promise.then((value) => {
+      if (settled) return;
+      settled = true;
+      clearTimeout(timer);
+      resolve(value);
+    }).catch(() => {
+      if (settled) return;
+      settled = true;
+      clearTimeout(timer);
+      resolve(fallback);
+    });
   });
 }
 </script>

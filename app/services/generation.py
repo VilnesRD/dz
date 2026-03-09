@@ -92,7 +92,14 @@ class DocumentGenerationService:
             name=doc_name,
             folder_id=template.doczilla_folder_id,
         )
-        doc_id = doc["id"]
+        # create_docz в текущем клиенте возвращает recordId (str),
+        # но держим фолбэк на старый dict-формат.
+        if isinstance(doc, dict):
+            doc_id = str(doc.get("id") or doc.get("recordId") or "").strip()
+        else:
+            doc_id = str(doc).strip()
+        if not doc_id:
+            raise RuntimeError("Doczilla createDocz не вернул ID документа")
         logger.info("deal=%s: doc_id=%s, заполняем переменные", deal_id, doc_id)
 
         await self.doczilla.fill_docz(doc_id, payload)

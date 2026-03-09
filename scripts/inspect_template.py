@@ -48,10 +48,11 @@ async def main():
                 return
             templates = await client.get_templates(section_id)
             print(f"\n📋 Найдено шаблонов: {len(templates)}\n")
-            print(f"{'Имя':<40} {'recordId':<38} {'link'}")
-            print("-" * 90)
+            print(f"{'Имя':<40} {'recordId':<38} {'link':<8} {'folder'}")
+            print("-" * 120)
             for t in templates:
-                print(f"{t.get('name', ''):<40} {t.get('recordId', ''):<38} {t.get('link', '')}")
+                folder = t.get("folderName") or "(root)"
+                print(f"{t.get('name', ''):<40} {t.get('recordId', ''):<38} {t.get('link', ''):<8} {folder}")
             return
 
         if not args.file_id and not args.link:
