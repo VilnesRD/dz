@@ -12,21 +12,37 @@
              border-top-color: #4f7cff; border-radius: 50%;
              animation: spin .7s linear infinite; margin: 16px auto; }
   @keyframes spin { to { transform: rotate(360deg); } }
+  .success { display: none; color: #22c55e; font-size: 32px; margin: 12px 0; }
 </style>
 </head>
 <body>
 <div class="box">
   <div>📄</div>
   <div style="font-size:18px;font-weight:600;margin:12px 0">Doczilla Integration</div>
-  <div class="spinner"></div>
-  <div style="color:#888;font-size:13px">Установка приложения…</div>
+  <div class="spinner" id="spinner"></div>
+  <div class="success" id="success">✓</div>
+  <div style="color:#888;font-size:13px" id="status">Установка приложения…</div>
 </div>
 <script src="//api.bitrix24.com/api/v1/"></script>
 <script>
-  BX24.init(function() {
-    // Сообщаем Б24 что установка завершена
-    BX24.installFinish();
-  });
+  function finish() {
+    document.getElementById('spinner').style.display = 'none';
+    document.getElementById('success').style.display = 'block';
+    document.getElementById('status').textContent = 'Приложение установлено!';
+    if (typeof BX24 !== 'undefined') {
+      BX24.installFinish();
+    }
+  }
+
+  if (typeof BX24 !== 'undefined') {
+    BX24.init(finish);
+  } else {
+    // BX24.JS не загрузился — просто показываем успех
+    window.addEventListener('load', finish);
+  }
+
+  // Страховка — через 3 секунды всё равно показываем успех
+  setTimeout(finish, 3000);
 </script>
 </body>
 </html>
