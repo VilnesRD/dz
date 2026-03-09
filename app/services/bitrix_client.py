@@ -61,26 +61,36 @@ class BitrixClient:
         from app.db import repository as repo
         with SessionLocal() as db:
             token = repo.get_oauth_token(db, self._domain)
-        if not token:
-            raise BitrixError(
-                f"OAuth-токен для портала '{self._domain}' не найден. Переустановите локальное приложение."
-            )
+            if not token:
+                raise BitrixError(
+                    f"OAuth-токен для портала '{self._domain}' не найден. Переустановите локальное приложение."
+                )
+            # Забираем все нужные значения до закрытия сессии,
+            # чтобы не ловить DetachedInstanceError.
+            access_token = str(token.access_token or "").strip()
+            refresh_token = str(token.refresh_token or "").strip()
+            expires_at = token.expires_at
+            member_id = token.member_id
 
-        if token.expires_at < datetime.utcnow():
-            token = await self._refresh_token(token)
-        if not token:
-            raise BitrixError(
-                f"Не удалось обновить OAuth-токен для портала '{self._domain}'. Проверьте CLIENT_ID/CLIENT_SECRET."
-            )
-        return token.access_token
+        if expires_at and expires_at < datetime.utcnow():
+            refreshed_access_token = await self._refresh_token(refresh_token, member_id)
+            if not refreshed_access_token:
+                raise BitrixError(
+                    f"Не удалось обновить OAuth-токен для портала '{self._domain}'. Проверьте CLIENT_ID/CLIENT_SECRET."
+                )
+            return refreshed_access_token
 
-    async def _refresh_token(self, token):
+        if not access_token:
+            raise BitrixError(f"OAuth access_token пуст для портала '{self._domain}'")
+        return access_token
+
+    async def _refresh_token(self, refresh_token: str, member_id: str | None = None) -> str | None:
         """Обновить истёкший токен через refresh_token."""
         if not settings.BITRIX_CLIENT_ID or not settings.BITRIX_CLIENT_SECRET:
             logger.warning("BITRIX_CLIENT_ID/BITRIX_CLIENT_SECRET не заданы, refresh невозможен")
             return None
-        if not token.refresh_token:
-            logger.warning("refresh_token отсутствует для domain=%s", token.domain)
+        if not refresh_token:
+            logger.warning("refresh_token отсутствует для domain=%s", self._domain)
             return None
 
         try:
@@ -90,7 +100,7 @@ class BitrixClient:
                     "grant_type":    "refresh_token",
                     "client_id":     settings.BITRIX_CLIENT_ID,
                     "client_secret": settings.BITRIX_CLIENT_SECRET,
-                    "refresh_token": token.refresh_token,
+                    "refresh_token": refresh_token,
                 }
             )
             data = r.json()
@@ -98,14 +108,16 @@ class BitrixClient:
                 from app.db.database import SessionLocal
                 from app.db import repository as repo
                 with SessionLocal() as db:
-                    return repo.save_oauth_token(
+                    row = repo.save_oauth_token(
                         db,
-                        token.domain,
+                        str(self._domain),
                         data["access_token"],
                         data["refresh_token"],
                         int(data.get("expires_in", 3600)),
-                        token.member_id,
+                        member_id,
                     )
+                    # Возвращаем примитив, не ORM-объект.
+                    return str(row.access_token or "").strip() or None
         except Exception as e:
             logger.error("refresh_token failed: %s", e)
         return None
