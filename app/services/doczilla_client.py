@@ -135,23 +135,25 @@ class DoczillaClient:
         root_folder_id = "00000000-0000-0000-0000-000000000000"
         fields = '["name", "recordId", "link", "isFolder", "type"]'
         sort = '[{"property":"isFolder","direction":"desc"},{"property":"lastModified","direction":"desc"}]'
-        filter_dotx = '[{"property":"type","value":"dotx"}]'
-        filter_folders = '[{"property":"type","value":"folder"}]'
 
-        # 1) Шаблоны в корне (folderId всегда root).
-        root_templates = await self._read_workspace(
+        # 1) Один запрос в корень без фильтра:
+        #    получаем и шаблоны, и папки первого уровня.
+        root_items = await self._read_workspace(
             section_id=section_id,
             folder_id=root_folder_id,
             fields=fields,
             sort=sort,
-            filter_expr=filter_dotx,
+            filter_expr=None,
         )
 
         templates: list[dict] = []
-        for item in root_templates:
+        folders: list[dict] = []
+
+        for item in root_items:
             if not isinstance(item, dict):
                 continue
             if self._is_folder(item):
+                folders.append(item)
                 continue
             record_id = str(item.get("recordId") or "").strip()
             link = str(item.get("link") or "").strip()
@@ -167,27 +169,7 @@ class DoczillaClient:
                 "folderName": None,
             })
 
-        # 2) Папки первого уровня.
-        folders = await self._read_workspace(
-            section_id=section_id,
-            folder_id=root_folder_id,
-            fields=fields,
-            sort=sort,
-            filter_expr=filter_folders,
-        )
-
-        # Фолбэк: некоторые инстансы не отдают фильтр type=folder.
-        if not folders:
-            root_items = await self._read_workspace(
-                section_id=section_id,
-                folder_id=root_folder_id,
-                fields=fields,
-                sort=sort,
-                filter_expr=None,
-            )
-            folders = [x for x in root_items if isinstance(x, dict) and self._is_folder(x)]
-
-        # 3) dotx в каждой папке первого уровня.
+        # 2) Проходим по папкам первого уровня и читаем их содержимое.
         for folder in folders:
             if not isinstance(folder, dict):
                 continue
@@ -196,14 +178,14 @@ class DoczillaClient:
             if not folder_id:
                 continue
 
-            child_templates = await self._read_workspace(
+            child_items = await self._read_workspace(
                 section_id=section_id,
                 folder_id=folder_id,
                 fields=fields,
                 sort=sort,
-                filter_expr=filter_dotx,
+                filter_expr=None,
             )
-            for item in child_templates:
+            for item in child_items:
                 if not isinstance(item, dict):
                     continue
                 if self._is_folder(item):
@@ -222,7 +204,7 @@ class DoczillaClient:
                     "folderName": folder_name,
                 })
 
-        # 4) Дедупликация по recordId.
+        # 3) Дедупликация по recordId.
         uniq: dict[str, dict] = {}
         for item in templates:
             rid = item["recordId"]
@@ -230,9 +212,9 @@ class DoczillaClient:
                 uniq[rid] = item
         result = list(uniq.values())
         logger.info(
-            "Doczilla templates scan: section=%s root=%d folders=%d total=%d",
+            "Doczilla templates scan: section=%s root_items=%d folders=%d total=%d",
             section_id,
-            len(root_templates),
+            len(root_items),
             len([f for f in folders if isinstance(f, dict)]),
             len(result),
         )
