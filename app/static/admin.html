@@ -9,11 +9,11 @@
 @import url('https://fonts.googleapis.com/css2?family=Manrope:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500&display=swap');
 *,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
 :root{
-  --bg:#0d0f18;--surface:#131724;--surface2:#1a1f30;--surface3:#1e2438;
-  --border:#252b3d;--border2:#2e3650;
-  --accent:#4f7cff;--accent2:#a78bfa;
+  --bg:#f3f4f7;--surface:#ffffff;--surface2:#f7f8fb;--surface3:#f1f3f7;
+  --border:#e2e5ec;--border2:#d3d9e4;
+  --accent:#ff4d7e;--accent2:#8f67ff;
   --success:#22c55e;--warn:#f59e0b;--danger:#ef4444;
-  --text:#e2e5f0;--muted:#6b7a99;--muted2:#4a5570;
+  --text:#2f3440;--muted:#7a8396;--muted2:#9aa2b3;
   --radius:10px;--font:'Manrope',sans-serif;--mono:'JetBrains Mono',monospace;
 }
 html,body{height:100%;background:var(--bg);color:var(--text);font-family:var(--font);font-size:14px;line-height:1.5}
@@ -21,21 +21,21 @@ a{color:var(--accent);text-decoration:none}
 
 /* ── Layout ─────────────────────────────────────────────────────── */
 .layout{display:flex;height:100vh;overflow:hidden}
-.sidebar{width:220px;flex-shrink:0;background:var(--surface);border-right:1px solid var(--border);display:flex;flex-direction:column;padding:20px 0}
+.sidebar{width:220px;flex-shrink:0;background:#eef0f4;border-right:1px solid var(--border);display:flex;flex-direction:column;padding:20px 0}
 .logo{padding:0 20px 20px;display:flex;align-items:center;gap:10px;border-bottom:1px solid var(--border);margin-bottom:14px}
 .logo-icon{width:34px;height:34px;background:linear-gradient(135deg,var(--accent),var(--accent2));border-radius:8px;display:flex;align-items:center;justify-content:center;font-size:16px;flex-shrink:0}
 .logo-text{font-size:13px;font-weight:700;line-height:1.2}
 .logo-text small{display:block;color:var(--muted);font-weight:400;font-size:11px}
 nav a{display:flex;align-items:center;gap:10px;padding:9px 20px;color:var(--muted);font-weight:500;transition:.15s;border-left:3px solid transparent;font-size:13px}
 nav a:hover{color:var(--text);background:var(--surface2)}
-nav a.active{color:var(--accent);border-left-color:var(--accent);background:rgba(79,124,255,.08)}
+nav a.active{color:var(--accent);border-left-color:var(--accent);background:rgba(255,77,126,.1)}
 .nav-icon{font-size:15px;width:18px;text-align:center}
 .sidebar-foot{margin-top:auto;padding:14px 20px;border-top:1px solid var(--border);font-size:12px;color:var(--muted)}
 .main{flex:1;overflow-y:auto;padding:24px 28px}
 
 /* ── Buttons ─────────────────────────────────────────────────────── */
 .btn{display:inline-flex;align-items:center;gap:6px;padding:8px 14px;border:none;border-radius:7px;font-family:var(--font);font-size:13px;font-weight:600;cursor:pointer;transition:.15s;white-space:nowrap}
-.btn-primary{background:var(--accent);color:#fff}.btn-primary:hover:not(:disabled){background:#6b93ff}
+.btn-primary{background:var(--accent);color:#fff}.btn-primary:hover:not(:disabled){background:#ff6b95}
 .btn-danger{background:rgba(239,68,68,.12);color:var(--danger);border:1px solid rgba(239,68,68,.2)}.btn-danger:hover{background:rgba(239,68,68,.22)}
 .btn-ghost{background:var(--surface2);color:var(--text);border:1px solid var(--border)}.btn-ghost:hover{border-color:var(--accent);color:var(--accent)}
 .btn-sm{padding:5px 10px;font-size:12px;border-radius:6px}
@@ -44,8 +44,8 @@ nav a.active{color:var(--accent);border-left-color:var(--accent);background:rgba
 /* ── Forms ───────────────────────────────────────────────────────── */
 .field{margin-bottom:14px}
 .field label{display:block;font-size:11px;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:.06em;margin-bottom:6px}
-input,select,textarea{width:100%;background:var(--bg);border:1px solid var(--border);border-radius:7px;color:var(--text);font-family:var(--font);font-size:13px;padding:9px 12px;transition:.15s}
-input:focus,select:focus,textarea:focus{outline:none;border-color:var(--accent);background:var(--surface)}
+input,select,textarea{width:100%;background:#fff;border:1px solid var(--border);border-radius:7px;color:var(--text);font-family:var(--font);font-size:13px;padding:9px 12px;transition:.15s}
+input:focus,select:focus,textarea:focus{outline:none;border-color:var(--accent);background:#fff}
 select{appearance:none;background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='10' height='6'%3E%3Cpath d='M0 0l5 6 5-6z' fill='%236b7a99'/%3E%3C/svg%3E");background-repeat:no-repeat;background-position:right 10px center;padding-right:28px;cursor:pointer}
 select option{background:#1a1f30}
 textarea{resize:vertical;min-height:56px}
@@ -69,7 +69,7 @@ textarea{resize:vertical;min-height:56px}
 
 /* ── Misc ────────────────────────────────────────────────────────── */
 .page-title{font-size:20px;font-weight:800;margin-bottom:20px}
-.card{background:var(--surface);border:1px solid var(--border);border-radius:var(--radius);padding:20px;margin-bottom:14px}
+.card{background:var(--surface);border:1px solid var(--border);border-radius:var(--radius);padding:20px;margin-bottom:14px;box-shadow:0 2px 8px rgba(24,28,39,.04)}
 .flex{display:flex;gap:8px;align-items:center}
 .flex-between{display:flex;justify-content:space-between;align-items:center;margin-bottom:16px}
 .empty{text-align:center;padding:44px;color:var(--muted);font-size:13px}
@@ -86,11 +86,11 @@ textarea{resize:vertical;min-height:56px}
 .alert-close:hover{opacity:1}
 .spinner-sm{width:13px;height:13px;border:2px solid rgba(255,255,255,.25);border-top-color:#fff;border-radius:50%;animation:spin .6s linear infinite;display:inline-block;flex-shrink:0}
 @keyframes spin{to{transform:rotate(360deg)}}
-.modal-bg{position:fixed;inset:0;background:rgba(0,0,0,.75);display:flex;align-items:center;justify-content:center;z-index:200;backdrop-filter:blur(2px)}
+.modal-bg{position:fixed;inset:0;background:rgba(20,26,38,.35);display:flex;align-items:center;justify-content:center;z-index:200;backdrop-filter:blur(2px)}
 .modal{background:var(--surface);border:1px solid var(--border);border-radius:14px;padding:28px;width:560px;max-height:90vh;overflow-y:auto}
 .modal-title{font-size:16px;font-weight:700;margin-bottom:20px}
 .login-wrap{display:flex;align-items:center;justify-content:center;height:100vh}
-.login-card{background:var(--surface);border:1px solid var(--border);border-radius:14px;padding:36px;width:360px;box-shadow:0 8px 40px rgba(0,0,0,.5)}
+.login-card{background:var(--surface);border:1px solid var(--border);border-radius:14px;padding:36px;width:360px;box-shadow:0 8px 40px rgba(20,26,38,.15)}
 .login-logo{text-align:center;margin-bottom:28px}
 .login-logo .icon{font-size:42px}
 .login-logo h1{font-size:18px;font-weight:800;margin-top:8px}
@@ -182,7 +182,7 @@ textarea{resize:vertical;min-height:56px}
 .ac-drop{
   position:absolute;top:calc(100%+3px);left:0;right:0;z-index:50;
   background:var(--surface);border:1px solid var(--border2);border-radius:8px;
-  box-shadow:0 8px 28px rgba(0,0,0,.55);max-height:210px;overflow-y:auto;
+  box-shadow:0 8px 28px rgba(20,26,38,.2);max-height:210px;overflow-y:auto;
 }
 .ac-item{padding:7px 10px;cursor:pointer;border-bottom:1px solid var(--border);transition:.1s}
 .ac-item:last-child{border-bottom:none}
@@ -193,6 +193,24 @@ textarea{resize:vertical;min-height:56px}
 .reset-btn{background:none;border:none;cursor:pointer;color:var(--muted2);font-size:13px;padding:3px;border-radius:4px;transition:.15s;align-self:start;margin-top:3px;line-height:1}
 .reset-btn:hover{color:var(--danger);background:rgba(239,68,68,.1)}
 .no-results{padding:32px;text-align:center;color:var(--muted);font-size:13px}
+
+/* Selector map builder */
+.selmap{
+  border:1px solid var(--border);
+  border-radius:8px;
+  background:var(--surface2);
+  padding:8px;
+}
+.selmap-row{
+  display:flex;
+  gap:6px;
+  align-items:center;
+  margin-bottom:6px;
+}
+.selmap-row:last-child{margin-bottom:0}
+.selmap-row .btn{padding:6px 8px;font-size:11px}
+.selmap-row input{padding:6px 8px;font-size:12px}
+.selmap-k{font-size:10px;color:var(--muted);min-width:76px;text-transform:uppercase;letter-spacing:.05em}
 </style>
 </head>
 <body x-data="app()" x-init="init()">
@@ -403,7 +421,8 @@ textarea{resize:vertical;min-height:56px}
               </div>
 
               <!-- Тело группы -->
-              <div class="group-body" x-show="!collapsed.has(g.id) || !g.kids.length">
+              <template x-if="!collapsed.has(g.id) || !g.kids.length">
+              <div class="group-body">
 
                 <!-- Собственная строка группы (если variable/condition, не selector) -->
                 <template x-if="g.self">
@@ -417,7 +436,7 @@ textarea{resize:vertical;min-height:56px}
                         <span x-show="g.self.variable_type" :class="typeBadge(g.self.variable_type)" x-text="g.self.variable_type" style="font-size:10px"></span>
                       </div>
                     </div>
-                    <select class="src-sel" x-model="g.self.source_type" @change="g.self.source_value='';acClose()">
+                    <select class="src-sel" x-model="g.self.source_type" @change="onSourceTypeChange(g.self)">
                       <option value="skip">— пропустить</option>
                       <option value="field">Поле Б24</option>
                       <option value="formula">Формула</option>
@@ -426,7 +445,30 @@ textarea{resize:vertical;min-height:56px}
                     </select>
                     <div>
                       <template x-if="g.self.source_type==='selector_map'">
-                        <textarea x-model="g.self.source_value" rows="2" style="font-family:var(--mono);font-size:11px;border-radius:6px;padding:6px 8px"></textarea>
+                        <div class="selmap" x-init="ensureSelMap(g.self)">
+                          <div class="selmap-row">
+                            <span class="selmap-k">Источник</span>
+                            <input type="text" x-model="ensureSelMap(g.self).source_field" @input="syncSelMap(g.self)" placeholder="deal.UF_CRM_LIST или doc.103">
+                          </div>
+                          <template x-for="(r,ri) in ensureSelMap(g.self).rules" :key="'gsr'+ri">
+                            <div class="selmap-row">
+                              <input type="text" x-model="r.value" @input="syncSelMap(g.self)" placeholder="Значение из Б24 (* = любое)">
+                              <input type="text" x-model="r.targets" @input="syncSelMap(g.self)" placeholder="ID condition: 201,202">
+                              <button class="btn btn-ghost btn-sm" type="button" @click="delSelRule(g.self,ri)">✕</button>
+                            </div>
+                          </template>
+                          <div class="selmap-row">
+                            <button class="btn btn-ghost btn-sm" type="button" @click="addSelRule(g.self)">+ Правило</button>
+                          </div>
+                          <div class="selmap-row">
+                            <span class="selmap-k">if filled</span>
+                            <input type="text" x-model="ensureSelMap(g.self).on_not_empty" @input="syncSelMap(g.self)" placeholder="ID condition при непустом значении">
+                          </div>
+                          <div class="selmap-row">
+                            <span class="selmap-k">if empty</span>
+                            <input type="text" x-model="ensureSelMap(g.self).on_empty" @input="syncSelMap(g.self)" placeholder="ID condition при пустом значении">
+                          </div>
+                        </div>
                       </template>
                       <template x-if="g.self.source_type!=='selector_map' && g.self.source_type!=='skip'">
                         <div class="ac-wrap">
@@ -451,7 +493,7 @@ textarea{resize:vertical;min-height:56px}
                       </template>
                       <div x-show="g.self.source_type==='skip'" style="height:32px"></div>
                     </div>
-                    <button class="reset-btn" @click="g.self.source_type='skip';g.self.source_value='';acClose()" title="Сбросить">✕</button>
+                    <button class="reset-btn" @click="resetSource(g.self)" title="Сбросить">✕</button>
                   </div>
                 </template>
 
@@ -467,7 +509,7 @@ textarea{resize:vertical;min-height:56px}
                         <span x-show="m.variable_type" :class="typeBadge(m.variable_type)" x-text="m.variable_type" style="font-size:10px"></span>
                       </div>
                     </div>
-                    <select class="src-sel" x-model="m.source_type" @change="m.source_value='';acClose()">
+                    <select class="src-sel" x-model="m.source_type" @change="onSourceTypeChange(m)">
                       <option value="skip">— пропустить</option>
                       <option value="field">Поле Б24</option>
                       <option value="formula">Формула</option>
@@ -476,7 +518,30 @@ textarea{resize:vertical;min-height:56px}
                     </select>
                     <div>
                       <template x-if="m.source_type==='selector_map'">
-                        <textarea x-model="m.source_value" rows="2" style="font-family:var(--mono);font-size:11px;border-radius:6px;padding:6px 8px"></textarea>
+                        <div class="selmap" x-init="ensureSelMap(m)">
+                          <div class="selmap-row">
+                            <span class="selmap-k">Источник</span>
+                            <input type="text" x-model="ensureSelMap(m).source_field" @input="syncSelMap(m)" placeholder="deal.UF_CRM_LIST или doc.103">
+                          </div>
+                          <template x-for="(r,ri) in ensureSelMap(m).rules" :key="'sr'+ri">
+                            <div class="selmap-row">
+                              <input type="text" x-model="r.value" @input="syncSelMap(m)" placeholder="Значение из Б24 (* = любое)">
+                              <input type="text" x-model="r.targets" @input="syncSelMap(m)" placeholder="ID condition: 201,202">
+                              <button class="btn btn-ghost btn-sm" type="button" @click="delSelRule(m,ri)">✕</button>
+                            </div>
+                          </template>
+                          <div class="selmap-row">
+                            <button class="btn btn-ghost btn-sm" type="button" @click="addSelRule(m)">+ Правило</button>
+                          </div>
+                          <div class="selmap-row">
+                            <span class="selmap-k">if filled</span>
+                            <input type="text" x-model="ensureSelMap(m).on_not_empty" @input="syncSelMap(m)" placeholder="ID condition при непустом значении">
+                          </div>
+                          <div class="selmap-row">
+                            <span class="selmap-k">if empty</span>
+                            <input type="text" x-model="ensureSelMap(m).on_empty" @input="syncSelMap(m)" placeholder="ID condition при пустом значении">
+                          </div>
+                        </div>
                       </template>
                       <template x-if="m.source_type!=='selector_map' && m.source_type!=='skip'">
                         <div class="ac-wrap">
@@ -501,11 +566,12 @@ textarea{resize:vertical;min-height:56px}
                       </template>
                       <div x-show="m.source_type==='skip'" style="height:32px"></div>
                     </div>
-                    <button class="reset-btn" @click="m.source_type='skip';m.source_value='';acClose()" title="Сбросить">✕</button>
+                    <button class="reset-btn" @click="resetSource(m)" title="Сбросить">✕</button>
                   </div>
                 </template>
 
               </div>
+              </template>
             </div>
           </template>
 
@@ -633,13 +699,14 @@ function app() { return {
   mAlert:'', mAlertT:'success',
   mSearch:'', mFilt:'all',
   collapsed: new Set(),
+  _kidsByParent:{},
   showHint:false,
 
   // autocomplete
   acTarget:null, acRes:[], acIdx:-1, _acQ:'',
 
   // b24 fields
-  showB24:false, b24Fields:[], b24Loading:false, b24Q:'',
+  showB24:false, b24Fields:[], b24LabelMap:{}, b24Loading:false, b24Q:'',
 
   logs:[],
 
@@ -736,6 +803,9 @@ function app() { return {
     const raw=await this.req('GET',`/admin/templates/${t.id}/mappings`);
     raw.forEach((m,i)=>m._n=i+1);
     this.mappings=raw;
+    this.rebuildMappingIndex();
+    this.autoCollapseGroups();
+    this.hydrateSelectorMaps();
     await this.loadB24();
   },
   closeMapper(){this.editTmpl=null;this.loadTmpls();},
@@ -746,7 +816,10 @@ function app() { return {
       const r=await this.req('POST',`/admin/templates/${this.editTmpl.id}/refresh-structure`);
       const raw=await this.req('GET',`/admin/templates/${this.editTmpl.id}/mappings`);
       raw.forEach((m,i)=>m._n=i+1);
-      this.mappings=raw; this.collapsed=new Set();
+      this.mappings=raw;
+      this.rebuildMappingIndex();
+      this.autoCollapseGroups();
+      this.hydrateSelectorMaps();
       this.mAlert=`Загружено ${r.count} переменных`; this.mAlertT='success';
     }catch(e){this.mAlert='Ошибка: '+e.message;this.mAlertT='error';}
     finally{this.loadingStruct=false;}
@@ -764,6 +837,27 @@ function app() { return {
 
   toggleG(id){
     const s=new Set(this.collapsed); s.has(id)?s.delete(id):s.add(id); this.collapsed=s;
+  },
+
+  rebuildMappingIndex(){
+    const idx={};
+    this.mappings.forEach(m=>{
+      const pid=String(m.parent_variable_id||'').trim();
+      if(!pid) return;
+      if(!idx[pid]) idx[pid]=[];
+      idx[pid].push(m);
+    });
+    this._kidsByParent=idx;
+  },
+
+  autoCollapseGroups(){
+    if(this.mappings.length<80){this.collapsed=new Set();return;}
+    const ids=new Set();
+    this.mappings.forEach(m=>{
+      const id=String(m.variable_id);
+      if((this._kidsByParent[id]||[]).length) ids.add(m.variable_id);
+    });
+    this.collapsed=ids;
   },
 
   // ── Computed stats ─────────────────────────────────────────────
@@ -819,9 +913,8 @@ function app() { return {
       if(!vis.has(String(m.variable_id))) return;
       if(m.parent_variable_id) return;
 
-      const kids=this.mappings.filter(c=>
-        String(c.parent_variable_id)===String(m.variable_id)&&vis.has(String(c.variable_id))
-      );
+      const allKids=this._kidsByParent[String(m.variable_id)]||[];
+      const kids=allKids.filter(c=>vis.has(String(c.variable_id)));
       const isContainer=m.variable_kind==='selector'||m.variable_kind==='replicator';
 
       groups.push({
@@ -838,6 +931,85 @@ function app() { return {
     });
 
     return groups;
+  },
+
+  // ── Selector map builder ───────────────────────────────────────
+  onSourceTypeChange(m){
+    if(m.source_type==='selector_map'){
+      this.ensureSelMap(m);
+      this.syncSelMap(m);
+    }else{
+      m.source_value='';
+      delete m._selMap;
+    }
+    this.acClose();
+  },
+  resetSource(m){
+    m.source_type='skip';
+    m.source_value='';
+    delete m._selMap;
+    this.acClose();
+  },
+  hydrateSelectorMaps(){
+    this.mappings.forEach(m=>{
+      if(m.source_type==='selector_map') this.ensureSelMap(m);
+    });
+  },
+  ensureSelMap(m){
+    if(m._selMap) return m._selMap;
+    const cfg={source_field:'',rules:[],on_not_empty:'',on_empty:''};
+    try{
+      const raw=JSON.parse(m.source_value||'{}');
+      cfg.source_field=String(raw.source_field||'').trim();
+      if(raw.options&&typeof raw.options==='object'){
+        Object.entries(raw.options).forEach(([k,v])=>{
+          const ids=Array.isArray(v)?v.map(x=>String(x).trim()).filter(Boolean):[String(v||'').trim()].filter(Boolean);
+          cfg.rules.push({value:String(k||''),targets:ids.join(',')});
+        });
+      }
+      const toText=(v)=>Array.isArray(v)?v.map(x=>String(x).trim()).filter(Boolean).join(','):String(v||'').trim();
+      cfg.on_not_empty=toText(raw.on_not_empty);
+      cfg.on_empty=toText(raw.on_empty);
+    }catch(_e){}
+    if(!cfg.rules.length) cfg.rules=[{value:'',targets:''}];
+    m._selMap=cfg;
+    return m._selMap;
+  },
+  _parseIdsText(text){
+    return String(text||'')
+      .split(',')
+      .map(x=>x.trim())
+      .filter(Boolean);
+  },
+  _oneOrMany(ids){
+    if(!ids.length) return '';
+    return ids.length===1?ids[0]:ids;
+  },
+  syncSelMap(m){
+    const cfg=this.ensureSelMap(m);
+    const out={source_field:String(cfg.source_field||'').trim(),options:{},this_condition_id:String(m.variable_id)};
+    cfg.rules.forEach(r=>{
+      const key=String(r.value||'').trim();
+      const ids=this._parseIdsText(r.targets);
+      if(!key||!ids.length) return;
+      out.options[key]=this._oneOrMany(ids);
+    });
+    const onNotEmpty=this._parseIdsText(cfg.on_not_empty);
+    const onEmpty=this._parseIdsText(cfg.on_empty);
+    if(onNotEmpty.length) out.on_not_empty=this._oneOrMany(onNotEmpty);
+    if(onEmpty.length) out.on_empty=this._oneOrMany(onEmpty);
+    m.source_value=JSON.stringify(out);
+  },
+  addSelRule(m){
+    const cfg=this.ensureSelMap(m);
+    cfg.rules.push({value:'',targets:''});
+    this.syncSelMap(m);
+  },
+  delSelRule(m,idx){
+    const cfg=this.ensureSelMap(m);
+    cfg.rules.splice(idx,1);
+    if(!cfg.rules.length) cfg.rules.push({value:'',targets:''});
+    this.syncSelMap(m);
   },
 
   // ── Autocomplete ──────────────────────────────────────────────
@@ -901,8 +1073,7 @@ function app() { return {
     return path.replace(new RegExp('('+q.replace(/[.*+?^${}()|[\]\\]/g,'\\$&')+')','gi'),'<em>$1</em>');
   },
   fLabel(path){
-    const f=this.b24Fields.find(x=>x.path===path);
-    return f?f.label:'';
+    return this.b24LabelMap[path]||'';
   },
 
   // ── B24 fields ────────────────────────────────────────────────
@@ -911,6 +1082,9 @@ function app() { return {
     try{
       const r=await this.req('GET','/admin/bitrix/fields');
       this.b24Fields=Array.isArray(r.fields)?r.fields:[];
+      const map={};
+      this.b24Fields.forEach(f=>{if(f&&f.path) map[f.path]=f.label||'';});
+      this.b24LabelMap=map;
       const stats=r?.meta?.stats||{};
       const custom=r?.meta?.custom_stats||{};
       const errs=Array.isArray(r?.meta?.errors)?r.meta.errors:[];
