@@ -95,3 +95,15 @@ class GenerationLog(Base):
     status        = Column(String(16), nullable=False, default="pending")  # success/error
     error_message = Column(Text, nullable=True)
     created_at    = Column(DateTime, default=datetime.utcnow)
+
+class OAuthToken(Base):
+    """OAuth-токены Битрикс24 — сохраняются при установке приложения."""
+    __tablename__ = "oauth_tokens"
+
+    id            = Column(Integer, primary_key=True)
+    domain        = Column(String(256), unique=True, nullable=False)
+    access_token  = Column(String(512), nullable=False)
+    refresh_token = Column(String(512), nullable=False)
+    expires_at    = Column(DateTime, nullable=False)
+    member_id     = Column(String(128), nullable=True)
+    updated_at    = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)

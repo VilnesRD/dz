@@ -113,3 +113,30 @@ def list_logs(db: Session, limit: int = 100) -> list[GenerationLog]:
               .order_by(GenerationLog.created_at.desc())
               .limit(limit)
               .all())
+
+# ── OAuth tokens ──────────────────────────────────────────────────────────────
+
+def save_oauth_token(db: Session, domain: str, access_token: str,
+                     refresh_token: str, expires_in: int, member_id: str = None):
+    from datetime import timedelta
+    from app.db.models import OAuthToken
+    expires_at = datetime.utcnow() + timedelta(seconds=expires_in - 60)
+    token = db.query(OAuthToken).filter_by(domain=domain).first()
+    if token:
+        token.access_token  = access_token
+        token.refresh_token = refresh_token
+        token.expires_at    = expires_at
+        token.member_id     = member_id
+        token.updated_at    = datetime.utcnow()
+    else:
+        token = OAuthToken(domain=domain, access_token=access_token,
+                           refresh_token=refresh_token, expires_at=expires_at,
+                           member_id=member_id)
+        db.add(token)
+    db.commit()
+    return token
+
+
+def get_oauth_token(db: Session, domain: str):
+    from app.db.models import OAuthToken
+    return db.query(OAuthToken).filter_by(domain=domain).first()
