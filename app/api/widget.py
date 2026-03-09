@@ -235,7 +235,9 @@ def _build_widget_redirect_target(request: Request, params: dict, form: dict) ->
     if placement_options:
         qs["PLACEMENT_OPTIONS"] = placement_options
 
-    target = str(request.url_for("serve_widget_get"))
+    # В reverse-proxy окружении request.url_for() может собрать http-схему.
+    # Для Bitrix placement всегда используем публичный HTTPS URL приложения.
+    target = f"{settings.APP_PUBLIC_URL.rstrip('/')}/bitrix/widget"
     if qs:
         target = f"{target}?{urlencode(qs)}"
     return target
