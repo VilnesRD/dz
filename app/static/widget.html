@@ -1,0 +1,403 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Doczilla — Генерация документа</title>
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=Manrope:wght@400;500;600;700&display=swap');
+
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+  :root {
+    --bg:        #0f1117;
+    --surface:   #181c27;
+    --border:    #252a3a;
+    --accent:    #4f7cff;
+    --accent-h:  #6b93ff;
+    --success:   #22c55e;
+    --error:     #ef4444;
+    --text:      #e8eaf0;
+    --muted:     #6b7280;
+    --radius:    12px;
+  }
+
+  html, body {
+    height: 100%;
+    background: var(--bg);
+    font-family: 'Manrope', sans-serif;
+    color: var(--text);
+    font-size: 14px;
+    line-height: 1.5;
+  }
+
+  body {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 20px;
+    min-height: 100vh;
+  }
+
+  .card {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    padding: 28px;
+    width: 100%;
+    max-width: 420px;
+    box-shadow: 0 8px 40px rgba(0,0,0,.45);
+  }
+
+  /* ── Header ── */
+  .header {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    margin-bottom: 24px;
+  }
+  .logo {
+    width: 38px; height: 38px;
+    background: linear-gradient(135deg, var(--accent), #a78bfa);
+    border-radius: 10px;
+    display: flex; align-items: center; justify-content: center;
+    font-size: 18px; flex-shrink: 0;
+  }
+  .header-text h1 { font-size: 16px; font-weight: 700; }
+  .header-text p  { font-size: 12px; color: var(--muted); margin-top: 2px; }
+
+  /* ── Deal info pill ── */
+  .deal-pill {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    background: rgba(79,124,255,.12);
+    border: 1px solid rgba(79,124,255,.25);
+    border-radius: 20px;
+    padding: 4px 12px 4px 8px;
+    font-size: 12px;
+    color: var(--accent-h);
+    margin-bottom: 20px;
+  }
+  .deal-pill span { width: 6px; height: 6px; border-radius: 50%; background: var(--accent); display: block; }
+
+  /* ── Form ── */
+  label {
+    display: block;
+    font-size: 12px;
+    font-weight: 600;
+    color: var(--muted);
+    text-transform: uppercase;
+    letter-spacing: .06em;
+    margin-bottom: 8px;
+  }
+
+  select {
+    width: 100%;
+    background: var(--bg);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    color: var(--text);
+    font-family: 'Manrope', sans-serif;
+    font-size: 14px;
+    padding: 11px 14px;
+    appearance: none;
+    background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='8' viewBox='0 0 12 8'%3E%3Cpath d='M1 1l5 5 5-5' stroke='%236b7280' stroke-width='1.5' fill='none' stroke-linecap='round'/%3E%3C/svg%3E");
+    background-repeat: no-repeat;
+    background-position: right 14px center;
+    cursor: pointer;
+    transition: border-color .2s;
+    margin-bottom: 20px;
+  }
+  select:focus { outline: none; border-color: var(--accent); }
+  select option { background: #1e2333; }
+
+  /* ── Button ── */
+  .btn {
+    width: 100%;
+    padding: 13px;
+    border: none;
+    border-radius: 8px;
+    font-family: 'Manrope', sans-serif;
+    font-size: 14px;
+    font-weight: 700;
+    cursor: pointer;
+    transition: all .2s;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 8px;
+    letter-spacing: .01em;
+  }
+  .btn-primary {
+    background: var(--accent);
+    color: #fff;
+  }
+  .btn-primary:hover:not(:disabled) { background: var(--accent-h); transform: translateY(-1px); }
+  .btn-primary:disabled { opacity: .5; cursor: not-allowed; transform: none; }
+
+  /* ── Status states ── */
+  .status {
+    display: none;
+    border-radius: 8px;
+    padding: 14px 16px;
+    margin-top: 16px;
+    font-size: 13px;
+    font-weight: 500;
+  }
+  .status.loading {
+    display: flex; align-items: center; gap: 10px;
+    background: rgba(79,124,255,.1);
+    border: 1px solid rgba(79,124,255,.2);
+    color: var(--accent-h);
+  }
+  .status.success {
+    display: block;
+    background: rgba(34,197,94,.1);
+    border: 1px solid rgba(34,197,94,.2);
+    color: var(--success);
+  }
+  .status.error {
+    display: block;
+    background: rgba(239,68,68,.1);
+    border: 1px solid rgba(239,68,68,.2);
+    color: var(--error);
+  }
+  .status a { color: inherit; font-weight: 700; }
+
+  /* ── Spinner ── */
+  .spinner {
+    width: 16px; height: 16px; flex-shrink: 0;
+    border: 2px solid rgba(79,124,255,.3);
+    border-top-color: var(--accent);
+    border-radius: 50%;
+    animation: spin .7s linear infinite;
+  }
+  @keyframes spin { to { transform: rotate(360deg); } }
+
+  /* ── Progress steps ── */
+  .steps {
+    display: none;
+    flex-direction: column;
+    gap: 6px;
+    margin-top: 16px;
+  }
+  .steps.visible { display: flex; }
+  .step {
+    display: flex; align-items: center; gap: 8px;
+    font-size: 12px; color: var(--muted);
+    transition: color .3s;
+  }
+  .step.done   { color: var(--success); }
+  .step.active { color: var(--text); }
+  .step-dot {
+    width: 8px; height: 8px; border-radius: 50%;
+    background: var(--border); flex-shrink: 0;
+    transition: background .3s;
+  }
+  .step.done   .step-dot { background: var(--success); }
+  .step.active .step-dot { background: var(--accent); animation: pulse 1s ease-in-out infinite; }
+  @keyframes pulse { 0%,100%{opacity:1} 50%{opacity:.4} }
+</style>
+</head>
+<body>
+
+<div class="card">
+  <div class="header">
+    <div class="logo">📄</div>
+    <div class="header-text">
+      <h1>Doczilla PRO</h1>
+      <p>Генерация документа из сделки</p>
+    </div>
+  </div>
+
+  <div class="deal-pill" id="dealPill">
+    <span></span>
+    Загрузка данных сделки…
+  </div>
+
+  <label for="templateSelect">Выберите шаблон</label>
+  <select id="templateSelect">
+    <option value="" disabled selected>— выберите —</option>
+    <!-- Шаблоны вставляются динамически из mapping.py через /api/widget-config -->
+  </select>
+
+  <button class="btn btn-primary" id="generateBtn" disabled onclick="generate()">
+    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+      <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/>
+      <polyline points="14 2 14 8 20 8"/>
+      <line x1="12" y1="18" x2="12" y2="12"/>
+      <line x1="9" y1="15" x2="15" y2="15"/>
+    </svg>
+    Сгенерировать PDF
+  </button>
+
+  <!-- Прогресс шагов -->
+  <div class="steps" id="steps">
+    <div class="step" id="s1"><div class="step-dot"></div> Получение данных из Б24</div>
+    <div class="step" id="s2"><div class="step-dot"></div> Создание анкеты в Doczilla</div>
+    <div class="step" id="s3"><div class="step-dot"></div> Заполнение переменных</div>
+    <div class="step" id="s4"><div class="step-dot"></div> Генерация PDF</div>
+    <div class="step" id="s5"><div class="step-dot"></div> Сохранение ссылки в сделку</div>
+  </div>
+
+  <div class="status loading" id="statusLoading">
+    <div class="spinner"></div>
+    <span id="statusLoadingText">Генерируем документ…</span>
+  </div>
+  <div class="status success" id="statusSuccess"></div>
+  <div class="status error"   id="statusError"></div>
+</div>
+
+<script>
+// ── Параметры из URL (Б24 передаёт их автоматически) ──────────────────────────
+const params  = new URLSearchParams(window.location.search);
+const DEAL_ID = params.get('DEAL_ID') || params.get('deal_id') || '';
+const DOMAIN  = params.get('DOMAIN')  || '';
+const TOKEN   = params.get('AUTH_ID') || params.get('auth[access_token]') || '';
+
+// URL бэкенда — при деплое замените на реальный домен
+// В dev-режиме работает через ngrok или localhost
+const API_BASE = window.location.origin;
+
+// ── Инициализация ─────────────────────────────────────────────────────────────
+document.addEventListener('DOMContentLoaded', async () => {
+  // Показать ID сделки в pill
+  document.getElementById('dealPill').innerHTML =
+    `<span></span> Сделка #${DEAL_ID || '—'}`;
+
+  // Загрузить список шаблонов с бэкенда
+  await loadTemplates();
+
+  // Активировать кнопку при выборе шаблона
+  document.getElementById('templateSelect').addEventListener('change', () => {
+    document.getElementById('generateBtn').disabled = false;
+  });
+});
+
+async function loadTemplates() {
+  try {
+    const res = await fetch(`${API_BASE}/api/widget-config`);
+    const data = await res.json();
+    const sel = document.getElementById('templateSelect');
+
+    data.templates.forEach(t => {
+      const opt = document.createElement('option');
+      opt.value = t.key;
+      opt.textContent = t.name;
+      sel.appendChild(opt);
+    });
+  } catch (e) {
+    showError('Не удалось загрузить список шаблонов: ' + e.message);
+  }
+}
+
+// ── Генерация ─────────────────────────────────────────────────────────────────
+async function generate() {
+  const templateKey = document.getElementById('templateSelect').value;
+  if (!templateKey) return;
+
+  if (!DEAL_ID) {
+    showError('Не удалось определить ID сделки. Откройте виджет из карточки сделки.');
+    return;
+  }
+
+  setUIGenerating();
+
+  // Анимация шагов (приблизительное время каждого)
+  const stepDelays = [0, 1200, 2500, 3500, 5000];
+  stepDelays.forEach((delay, i) => {
+    setTimeout(() => setStep(i + 1, 'active'), delay);
+  });
+
+  try {
+    const res = await fetch(`${API_BASE}/api/generate`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        deal_id: DEAL_ID,
+        template_key: templateKey,
+        // Передаём токен Б24 — бэкенд может использовать его для on-behalf запросов
+        bitrix_token: TOKEN,
+        bitrix_domain: DOMAIN,
+      }),
+    });
+
+    const data = await res.json();
+
+    if (!res.ok) throw new Error(data.detail || `HTTP ${res.status}`);
+
+    // Отмечаем все шаги выполненными
+    [1,2,3,4,5].forEach(i => setStep(i, 'done'));
+
+    showSuccess(
+      `✅ Документ <strong>${escHtml(data.doc_name)}</strong> создан.<br>` +
+      `<a href="${escHtml(data.doc_link)}" target="_blank">Открыть в Doczilla →</a>`
+    );
+
+    // Закрываем iframe через 3 сек (Б24 BX24.closeApplication)
+    setTimeout(() => {
+      if (window.BX24) BX24.closeApplication();
+    }, 3000);
+
+  } catch (err) {
+    [1,2,3,4,5].forEach(i => {
+      const el = document.getElementById('s' + i);
+      if (!el.classList.contains('done')) el.classList.remove('active');
+    });
+    showError('Ошибка: ' + err.message);
+  }
+}
+
+// ── UI helpers ────────────────────────────────────────────────────────────────
+function setUIGenerating() {
+  document.getElementById('generateBtn').disabled = true;
+  document.getElementById('templateSelect').disabled = true;
+  document.getElementById('steps').classList.add('visible');
+  document.getElementById('statusLoading').style.display = 'flex';
+  document.getElementById('statusSuccess').style.display = 'none';
+  document.getElementById('statusError').style.display = 'none';
+}
+
+function setStep(n, state) {
+  const el = document.getElementById('s' + n);
+  if (!el) return;
+  el.className = 'step ' + state;
+  // Предыдущий шаг помечаем done
+  if (state === 'active' && n > 1) setStep(n - 1, 'done');
+}
+
+function showSuccess(html) {
+  document.getElementById('statusLoading').style.display = 'none';
+  const el = document.getElementById('statusSuccess');
+  el.innerHTML = html;
+  el.style.display = 'block';
+}
+
+function showError(msg) {
+  document.getElementById('statusLoading').style.display = 'none';
+  const el = document.getElementById('statusError');
+  el.textContent = msg;
+  el.style.display = 'block';
+  document.getElementById('generateBtn').disabled = false;
+  document.getElementById('templateSelect').disabled = false;
+}
+
+function escHtml(str) {
+  return String(str).replace(/[&<>"']/g, c =>
+    ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+}
+</script>
+
+<!-- Б24 JS SDK (доступен только при открытии внутри Б24) -->
+<script src="//api.bitrix24.com/api/v1/"></script>
+<script>
+  if (window.BX24) {
+    BX24.init(() => {
+      // Подогнать высоту iframe под контент
+      BX24.fitWindow();
+    });
+  }
+</script>
+</body>
+</html>

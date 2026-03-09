@@ -1,0 +1,51 @@
+version: "3.9"
+
+# Интеграция Битрикс24 ↔ Doczilla PRO
+#
+# Архитектура под существующий nginx на хосте:
+#   - Контейнер слушает на 127.0.0.1:8010 (не торчит наружу)
+#   - Хостовый nginx проксирует /  →  127.0.0.1:8010
+#   - SQLite лежит в named volume (data), переживает пересборку контейнера
+#
+# Запуск:
+#   docker compose up -d
+#
+# Добавить в хостовый nginx:
+#   location / {
+#       proxy_pass http://127.0.0.1:8010;
+#       proxy_set_header Host $host;
+#       proxy_set_header X-Forwarded-Proto $scheme;
+#   }
+
+services:
+  app:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: doczilla-integration
+    restart: unless-stopped
+
+    # Слушаем только на loopback — nginx на хосте проксирует
+    ports:
+      - "127.0.0.1:8010:8000"
+
+    volumes:
+      # SQLite база и загруженные файлы — персистентны
+      - data:/app/data
+      # .env монтируем снаружи, не запекаем в образ
+      - ./.env:/app/.env:ro
+
+    environment:
+      - DB_PATH=/app/data/db.sqlite3
+      - PYTHONUNBUFFERED=1
+
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8000/health"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 10s
+
+volumes:
+  data:
+    name: doczilla-integration-data

@@ -1,0 +1,849 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Doczilla Integration — Админ</title>
+<script defer src="https://cdn.jsdelivr.net/npm/alpinejs@3.14.1/dist/cdn.min.js"></script>
+<style>
+@import url('https://fonts.googleapis.com/css2?family=Manrope:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500&display=swap');
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+:root{
+  --bg:#0d0f18;--surface:#131724;--surface2:#1a1f30;--surface3:#1e2438;
+  --border:#252b3d;--border2:#2e3650;
+  --accent:#4f7cff;--accent2:#a78bfa;
+  --success:#22c55e;--warn:#f59e0b;--danger:#ef4444;
+  --text:#e2e5f0;--muted:#6b7a99;--muted2:#4a5570;
+  --radius:10px;--font:'Manrope',sans-serif;--mono:'JetBrains Mono',monospace;
+}
+html,body{height:100%;background:var(--bg);color:var(--text);font-family:var(--font);font-size:14px;line-height:1.5}
+a{color:var(--accent);text-decoration:none}
+
+/* ── Layout ─────────────────────────────────────────────────────── */
+.layout{display:flex;height:100vh;overflow:hidden}
+.sidebar{width:220px;flex-shrink:0;background:var(--surface);border-right:1px solid var(--border);display:flex;flex-direction:column;padding:20px 0}
+.logo{padding:0 20px 20px;display:flex;align-items:center;gap:10px;border-bottom:1px solid var(--border);margin-bottom:14px}
+.logo-icon{width:34px;height:34px;background:linear-gradient(135deg,var(--accent),var(--accent2));border-radius:8px;display:flex;align-items:center;justify-content:center;font-size:16px;flex-shrink:0}
+.logo-text{font-size:13px;font-weight:700;line-height:1.2}
+.logo-text small{display:block;color:var(--muted);font-weight:400;font-size:11px}
+nav a{display:flex;align-items:center;gap:10px;padding:9px 20px;color:var(--muted);font-weight:500;transition:.15s;border-left:3px solid transparent;font-size:13px}
+nav a:hover{color:var(--text);background:var(--surface2)}
+nav a.active{color:var(--accent);border-left-color:var(--accent);background:rgba(79,124,255,.08)}
+.nav-icon{font-size:15px;width:18px;text-align:center}
+.sidebar-foot{margin-top:auto;padding:14px 20px;border-top:1px solid var(--border);font-size:12px;color:var(--muted)}
+.main{flex:1;overflow-y:auto;padding:24px 28px}
+
+/* ── Buttons ─────────────────────────────────────────────────────── */
+.btn{display:inline-flex;align-items:center;gap:6px;padding:8px 14px;border:none;border-radius:7px;font-family:var(--font);font-size:13px;font-weight:600;cursor:pointer;transition:.15s;white-space:nowrap}
+.btn-primary{background:var(--accent);color:#fff}.btn-primary:hover:not(:disabled){background:#6b93ff}
+.btn-danger{background:rgba(239,68,68,.12);color:var(--danger);border:1px solid rgba(239,68,68,.2)}.btn-danger:hover{background:rgba(239,68,68,.22)}
+.btn-ghost{background:var(--surface2);color:var(--text);border:1px solid var(--border)}.btn-ghost:hover{border-color:var(--accent);color:var(--accent)}
+.btn-sm{padding:5px 10px;font-size:12px;border-radius:6px}
+.btn:disabled{opacity:.4;cursor:not-allowed}
+
+/* ── Forms ───────────────────────────────────────────────────────── */
+.field{margin-bottom:14px}
+.field label{display:block;font-size:11px;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:.06em;margin-bottom:6px}
+input,select,textarea{width:100%;background:var(--bg);border:1px solid var(--border);border-radius:7px;color:var(--text);font-family:var(--font);font-size:13px;padding:9px 12px;transition:.15s}
+input:focus,select:focus,textarea:focus{outline:none;border-color:var(--accent);background:var(--surface)}
+select{appearance:none;background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='10' height='6'%3E%3Cpath d='M0 0l5 6 5-6z' fill='%236b7a99'/%3E%3C/svg%3E");background-repeat:no-repeat;background-position:right 10px center;padding-right:28px;cursor:pointer}
+select option{background:#1a1f30}
+textarea{resize:vertical;min-height:56px}
+
+/* ── Table ───────────────────────────────────────────────────────── */
+.tbl{width:100%;border-collapse:collapse}
+.tbl th{text-align:left;padding:8px 12px;font-size:11px;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:.06em;border-bottom:1px solid var(--border)}
+.tbl td{padding:10px 12px;border-bottom:1px solid var(--border);vertical-align:middle}
+.tbl tr:last-child td{border-bottom:none}
+.tbl tr:hover td{background:var(--surface2)}
+
+/* ── Badges ──────────────────────────────────────────────────────── */
+.badge{display:inline-block;padding:2px 7px;border-radius:20px;font-size:11px;font-weight:600}
+.badge-blue{background:rgba(79,124,255,.15);color:#7fa0ff}
+.badge-purple{background:rgba(167,139,250,.15);color:#c4b5fd}
+.badge-green{background:rgba(34,197,94,.15);color:#4ade80}
+.badge-amber{background:rgba(245,158,11,.15);color:#fbbf24}
+.badge-red{background:rgba(239,68,68,.15);color:#f87171}
+.badge-gray{background:rgba(107,122,153,.12);color:var(--muted)}
+.badge-teal{background:rgba(20,184,166,.15);color:#2dd4bf}
+
+/* ── Misc ────────────────────────────────────────────────────────── */
+.page-title{font-size:20px;font-weight:800;margin-bottom:20px}
+.card{background:var(--surface);border:1px solid var(--border);border-radius:var(--radius);padding:20px;margin-bottom:14px}
+.flex{display:flex;gap:8px;align-items:center}
+.flex-between{display:flex;justify-content:space-between;align-items:center;margin-bottom:16px}
+.empty{text-align:center;padding:44px;color:var(--muted);font-size:13px}
+.mono{font-family:var(--mono);font-size:12px}
+.hint{font-size:11px;color:var(--muted);margin-top:4px;font-family:var(--mono)}
+.alert{padding:11px 14px;border-radius:7px;font-size:13px;margin-bottom:12px}
+.alert-error{background:rgba(239,68,68,.1);border:1px solid rgba(239,68,68,.2);color:var(--danger)}
+.alert-success{background:rgba(34,197,94,.1);border:1px solid rgba(34,197,94,.2);color:var(--success)}
+.spinner-sm{width:13px;height:13px;border:2px solid rgba(255,255,255,.25);border-top-color:#fff;border-radius:50%;animation:spin .6s linear infinite;display:inline-block;flex-shrink:0}
+@keyframes spin{to{transform:rotate(360deg)}}
+.modal-bg{position:fixed;inset:0;background:rgba(0,0,0,.75);display:flex;align-items:center;justify-content:center;z-index:200;backdrop-filter:blur(2px)}
+.modal{background:var(--surface);border:1px solid var(--border);border-radius:14px;padding:28px;width:560px;max-height:90vh;overflow-y:auto}
+.modal-title{font-size:16px;font-weight:700;margin-bottom:20px}
+.login-wrap{display:flex;align-items:center;justify-content:center;height:100vh}
+.login-card{background:var(--surface);border:1px solid var(--border);border-radius:14px;padding:36px;width:360px;box-shadow:0 8px 40px rgba(0,0,0,.5)}
+.login-logo{text-align:center;margin-bottom:28px}
+.login-logo .icon{font-size:42px}
+.login-logo h1{font-size:18px;font-weight:800;margin-top:8px}
+.login-logo p{color:var(--muted);font-size:13px;margin-top:4px}
+
+/* ══ MAPPER ══════════════════════════════════════════════════════════
+   Все специфичные стили маппера сгруппированы здесь
+═══════════════════════════════════════════════════════════════════ */
+
+/* Прогресс */
+.prog-wrap{background:var(--surface);border:1px solid var(--border);border-radius:var(--radius);padding:12px 16px;margin-bottom:10px}
+.prog-meta{display:flex;justify-content:space-between;align-items:baseline;margin-bottom:7px;font-size:12px;color:var(--muted)}
+.prog-meta strong{font-size:16px;font-weight:800;color:var(--text)}
+.prog-track{height:5px;background:var(--border2);border-radius:3px;overflow:hidden}
+.prog-fill{height:100%;border-radius:3px;background:linear-gradient(90deg,var(--accent),var(--accent2));transition:width .5s ease}
+
+/* Toolbar: поиск + чипы */
+.mapper-toolbar{
+  position:sticky;top:0;z-index:20;
+  background:var(--surface);border:1px solid var(--border);
+  border-radius:var(--radius);padding:10px 14px;margin-bottom:10px;
+  display:flex;gap:10px;align-items:center;
+  box-shadow:0 4px 12px rgba(0,0,0,.3);
+}
+.search-wrap{flex:1 1 200px;min-width:0;position:relative}
+.search-wrap input{padding-left:32px;background:var(--surface2);font-size:13px}
+.search-ico{position:absolute;left:10px;top:50%;transform:translateY(-50%);color:var(--muted);font-size:13px;pointer-events:none}
+.chips{display:flex;gap:5px;flex-wrap:wrap}
+.chip{
+  display:inline-flex;align-items:center;gap:4px;
+  padding:4px 9px;border-radius:20px;font-size:11px;font-weight:600;cursor:pointer;
+  border:1px solid var(--border);background:var(--surface2);color:var(--muted);
+  transition:.15s;white-space:nowrap;
+}
+.chip:hover{border-color:var(--accent);color:var(--text)}
+.chip.on{background:rgba(79,124,255,.15);border-color:rgba(79,124,255,.35);color:var(--accent)}
+.chip-n{background:var(--border2);border-radius:10px;padding:1px 5px;font-size:10px;color:var(--muted)}
+.chip.on .chip-n{background:rgba(79,124,255,.25);color:var(--accent)}
+.hint-btn{position:relative}
+.hint-popup{
+  position:absolute;right:0;top:calc(100%+6px);width:320px;
+  background:var(--surface);border:1px solid var(--border2);border-radius:10px;
+  padding:14px;font-size:12px;color:var(--muted);
+  box-shadow:0 8px 24px rgba(0,0,0,.55);z-index:30;
+}
+.hint-popup code{font-family:var(--mono);color:var(--accent);font-size:11px}
+.hint-popup .row{display:flex;flex-direction:column;gap:2px;padding:5px 0;border-bottom:1px solid var(--border)}
+.hint-popup .row:last-child{border-bottom:none}
+
+/* Группы */
+.group{margin-bottom:6px;border-radius:var(--radius);overflow:hidden;border:1px solid var(--border)}
+.group-head{
+  display:flex;align-items:center;gap:8px;
+  padding:9px 14px;background:var(--surface2);cursor:pointer;
+  user-select:none;transition:background .15s;
+}
+.group-head:hover{background:var(--surface3)}
+.grp-arrow{font-size:10px;color:var(--muted);transition:transform .2s;flex-shrink:0;width:12px}
+.grp-arrow.open{transform:rotate(90deg)}
+.grp-name{font-weight:700;font-size:13px;flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.grp-meta{font-size:11px;color:var(--muted);white-space:nowrap;flex-shrink:0}
+.group-body{border-top:1px solid var(--border)}
+
+/* Строка маппинга */
+.mrow{
+  display:grid;
+  grid-template-columns:20px minmax(0,1fr) 115px minmax(0,1.4fr) 24px;
+  column-gap:8px;align-items:start;
+  padding:9px 14px;border-bottom:1px solid var(--border);
+  transition:background .1s;
+}
+.mrow:last-child{border-bottom:none}
+.mrow:hover{background:rgba(79,124,255,.025)}
+.mrow.child{background:rgba(0,0,0,.12);padding-left:28px}
+.mrow.filled .row-n{color:var(--success)}
+.mrow.skipped .row-n{color:var(--muted2)}
+.row-n{font-family:var(--mono);font-size:10px;color:var(--muted2);padding-top:3px;text-align:right}
+.var-name{font-weight:600;font-size:13px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.var-id{font-family:var(--mono);font-size:10px;color:var(--muted2);margin-top:1px}
+.var-badges{display:flex;gap:3px;flex-wrap:wrap;margin-top:4px}
+.src-sel{font-size:12px!important;padding:6px 26px 6px 8px!important;border-radius:6px!important}
+
+/* Input + autocomplete */
+.ac-wrap{position:relative}
+.ac-wrap input{font-size:12px!important;padding:7px 8px!important;border-radius:6px!important}
+.ac-label{font-size:10px;color:var(--success);margin-top:2px;font-family:var(--mono);line-height:1.3;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.ac-drop{
+  position:absolute;top:calc(100%+3px);left:0;right:0;z-index:50;
+  background:var(--surface);border:1px solid var(--border2);border-radius:8px;
+  box-shadow:0 8px 28px rgba(0,0,0,.55);max-height:210px;overflow-y:auto;
+}
+.ac-item{padding:7px 10px;cursor:pointer;border-bottom:1px solid var(--border);transition:.1s}
+.ac-item:last-child{border-bottom:none}
+.ac-item:hover,.ac-item.focused{background:var(--surface2)}
+.ac-item-label{font-size:12px;font-weight:500;color:var(--text)}
+.ac-item-path{font-family:var(--mono);font-size:10px;color:var(--muted)}
+.ac-item-path em{color:var(--accent);font-style:normal}
+.reset-btn{background:none;border:none;cursor:pointer;color:var(--muted2);font-size:13px;padding:3px;border-radius:4px;transition:.15s;align-self:start;margin-top:3px;line-height:1}
+.reset-btn:hover{color:var(--danger);background:rgba(239,68,68,.1)}
+.no-results{padding:32px;text-align:center;color:var(--muted);font-size:13px}
+</style>
+</head>
+<body x-data="app()" x-init="init()">
+
+<!-- LOGIN -->
+<template x-if="!token">
+<div class="login-wrap">
+  <div class="login-card">
+    <div class="login-logo">
+      <div class="icon">📄</div>
+      <h1>Doczilla Integration</h1>
+      <p>Панель администратора</p>
+    </div>
+    <div x-show="loginErr" class="alert alert-error" x-text="loginErr"></div>
+    <div class="field"><label>Логин</label>
+      <input type="text" x-model="lf.u" @keydown.enter="login()" placeholder="admin" autofocus></div>
+    <div class="field"><label>Пароль</label>
+      <input type="password" x-model="lf.p" @keydown.enter="login()" placeholder="••••••••"></div>
+    <button class="btn btn-primary" style="width:100%;margin-top:4px" @click="login()" :disabled="lLoading">
+      <span x-show="lLoading" class="spinner-sm"></span>
+      <span x-text="lLoading?'Входим…':'Войти'"></span>
+    </button>
+  </div>
+</div>
+</template>
+
+<!-- APP -->
+<template x-if="token">
+<div class="layout">
+  <aside class="sidebar">
+    <div class="logo">
+      <div class="logo-icon">📄</div>
+      <div class="logo-text">Doczilla<small>Integration Admin</small></div>
+    </div>
+    <nav>
+      <a href="#" :class="{active:pg==='tmpl'}" @click.prevent="pg='tmpl'">
+        <span class="nav-icon">🗂</span> Шаблоны
+      </a>
+      <a href="#" :class="{active:pg==='logs'}" @click.prevent="pg='logs';loadLogs()">
+        <span class="nav-icon">📋</span> Логи
+      </a>
+    </nav>
+    <div class="sidebar-foot">
+      <span x-text="me?.username"></span><br>
+      <a href="#" @click.prevent="logout()" style="color:var(--danger)">Выйти</a>
+    </div>
+  </aside>
+
+  <main class="main">
+
+    <!-- ── TEMPLATES LIST ─────────────────────────────────────── -->
+    <template x-if="pg==='tmpl' && !editTmpl">
+      <div>
+        <div class="flex-between">
+          <h1 class="page-title" style="margin:0">Шаблоны</h1>
+          <button class="btn btn-primary" @click="openNew()">+ Добавить</button>
+        </div>
+        <div x-show="tmpls.length===0" class="empty card">Нет шаблонов.</div>
+        <div x-show="tmpls.length>0" class="card" style="padding:0;overflow:hidden">
+          <table class="tbl">
+            <thead><tr><th>Название / Ключ</th><th>Doczilla</th><th>Маппинг</th><th>Структура</th><th>Статус</th><th></th></tr></thead>
+            <tbody>
+              <template x-for="t in tmpls" :key="t.id">
+                <tr>
+                  <td>
+                    <div style="font-weight:600" x-text="t.name"></div>
+                    <div class="mono" style="color:var(--muted)" x-text="t.key"></div>
+                  </td>
+                  <td>
+                    <div class="mono" x-text="t.doczilla_file_id.slice(0,16)+'…'"></div>
+                    <div class="mono" style="color:var(--muted)" x-text="'link: '+t.doczilla_link"></div>
+                  </td>
+                  <td><span :class="t.mappings_count>0?'badge badge-green':'badge badge-gray'" x-text="t.mappings_count+' полей'"></span></td>
+                  <td>
+                    <span x-show="!t.has_structure" class="badge badge-amber">Нет</span>
+                    <span x-show="t.has_structure" class="badge badge-green">Есть</span>
+                  </td>
+                  <td><span :class="t.active?'badge badge-blue':'badge badge-gray'" x-text="t.active?'Активен':'Выкл'"></span></td>
+                  <td><div class="flex">
+                    <button class="btn btn-ghost btn-sm" @click="openMapper(t)">Маппинг</button>
+                    <button class="btn btn-ghost btn-sm" @click="editT(t)">✏️</button>
+                    <button class="btn btn-danger btn-sm" @click="delT(t.id)">🗑</button>
+                  </div></td>
+                </tr>
+              </template>
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </template>
+
+    <!-- ══ MAPPER ══════════════════════════════════════════════ -->
+    <template x-if="pg==='tmpl' && editTmpl">
+      <div>
+        <!-- Header -->
+        <div class="flex-between" style="margin-bottom:12px">
+          <div class="flex">
+            <button class="btn btn-ghost btn-sm" @click="closeMapper()">← Назад</button>
+            <div>
+              <div style="font-size:17px;font-weight:800" x-text="editTmpl.name"></div>
+              <div class="mono" style="color:var(--muted);font-size:11px" x-text="'key: '+editTmpl.key"></div>
+            </div>
+          </div>
+          <div class="flex">
+            <button class="btn btn-ghost" @click="refreshStruct()" :disabled="loadingStruct">
+              <span x-show="loadingStruct" class="spinner-sm"></span>🔄 Обновить
+            </button>
+            <button class="btn btn-primary" @click="saveMappings()" :disabled="saving">
+              <span x-show="saving" class="spinner-sm"></span>💾 Сохранить
+            </button>
+          </div>
+        </div>
+
+        <div x-show="mAlert" class="alert" :class="mAlertT==='error'?'alert-error':'alert-success'" x-text="mAlert"></div>
+
+        <div x-show="mappings.length===0" class="empty card">
+          Нажмите «Обновить» — система загрузит все переменные из Doczilla.
+        </div>
+
+        <template x-if="mappings.length>0">
+        <div>
+
+          <!-- Прогресс -->
+          <div class="prog-wrap">
+            <div class="prog-meta">
+              <div>
+                <strong x-text="mStats.filled"></strong>
+                <span> из </span>
+                <strong x-text="mStats.total"></strong>
+                <span style="margin-left:4px">переменных настроено</span>
+              </div>
+              <div>
+                <span x-text="mStats.pct+'%'"></span>
+                <span style="margin-left:8px;color:var(--muted2)" x-text="mStats.skipped+' пропущено'"></span>
+              </div>
+            </div>
+            <div class="prog-track">
+              <div class="prog-fill" :style="'width:'+mStats.pct+'%'"></div>
+            </div>
+          </div>
+
+          <!-- Toolbar -->
+          <div class="mapper-toolbar">
+            <div class="search-wrap">
+              <span class="search-ico">🔍</span>
+              <input type="text" x-model="mSearch" placeholder="Поиск по названию или id переменной…" @input="acClose()">
+            </div>
+            <div class="chips">
+              <template x-for="c in mChips" :key="c.k">
+                <div class="chip" :class="{on:mFilt===c.k}" @click="mFilt=c.k">
+                  <span x-text="c.label"></span>
+                  <span class="chip-n" x-text="c.n"></span>
+                </div>
+              </template>
+            </div>
+            <div class="hint-btn">
+              <button class="btn btn-ghost btn-sm" @click="showHint=!showHint" title="Форматы полей">❓</button>
+              <div class="hint-popup" x-show="showHint" x-transition @click.outside="showHint=false">
+                <div style="font-weight:700;color:var(--text);margin-bottom:8px">Форматы source_value</div>
+                <div class="row"><code>deal.TITLE</code><span style="color:var(--muted)">поле сделки</span></div>
+                <div class="row"><code>contact.NAME</code><span style="color:var(--muted)">поле контакта</span></div>
+                <div class="row"><code>company.TITLE</code><span style="color:var(--muted)">поле компании</span></div>
+                <div class="row"><code>{deal.NAME} {contact.LAST_NAME}</code><span style="color:var(--muted)">формула</span></div>
+                <div class="row"><code style="color:var(--success)">Москва</code><span style="color:var(--muted)">фиксированное значение</span></div>
+                <div style="margin-top:10px;padding-top:8px;border-top:1px solid var(--border)">
+                  <span style="cursor:pointer;color:var(--accent)" @click="showB24=true;showHint=false">📋 Справочник полей Б24 →</span>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <!-- Группы -->
+          <div x-show="filtGroups.length===0" class="no-results card">
+            Ничего не найдено по запросу «<span x-text="mSearch"></span>»
+          </div>
+
+          <template x-for="g in filtGroups" :key="g.id">
+            <div class="group">
+
+              <!-- Заголовок группы -->
+              <div class="group-head" @click="g.kids.length && toggleG(g.id)">
+                <span class="grp-arrow" :class="{open:!collapsed.has(g.id)}" x-show="g.kids.length">▶</span>
+                <span x-show="!g.kids.length" style="width:12px;flex-shrink:0"></span>
+                <span x-text="g.icon" style="font-size:14px;flex-shrink:0"></span>
+                <span class="grp-name" x-text="g.name"></span>
+                <span x-show="g.selectorType"
+                      class="badge badge-gray"
+                      x-text="g.selectorType==='radio'?'один из':'несколько'"
+                      style="font-size:10px;margin-right:4px"></span>
+                <span :class="kindBadge(g.kind)" x-text="g.kind" style="font-size:10px"></span>
+                <span class="grp-meta" x-show="g.kids.length">
+                  <span :style="g.filledN===g.totalN?'color:var(--success)':''" x-text="g.filledN+'/'+g.totalN+' настроено'"></span>
+                </span>
+                <span class="grp-meta" x-show="!g.kids.length">
+                  <span :class="g.self?.source_type!=='skip'?'badge badge-green':'badge badge-gray'"
+                        x-text="g.self?.source_type!=='skip'?'настроено':'пропущено'"
+                        style="font-size:10px"></span>
+                </span>
+              </div>
+
+              <!-- Тело группы -->
+              <div class="group-body" x-show="!collapsed.has(g.id) || !g.kids.length">
+
+                <!-- Собственная строка группы (если variable/condition, не selector) -->
+                <template x-if="g.self">
+                  <div class="mrow" :class="{filled:g.self.source_type!=='skip',skipped:g.self.source_type==='skip'}">
+                    <div class="row-n" x-text="g.self._n"></div>
+                    <div>
+                      <div class="var-name" x-text="g.self.variable_name"></div>
+                      <div class="var-id" x-text="'id: '+g.self.variable_id"></div>
+                      <div class="var-badges">
+                        <span :class="kindBadge(g.self.variable_kind)" x-text="g.self.variable_kind" style="font-size:10px"></span>
+                        <span x-show="g.self.variable_type" :class="typeBadge(g.self.variable_type)" x-text="g.self.variable_type" style="font-size:10px"></span>
+                      </div>
+                    </div>
+                    <select class="src-sel" x-model="g.self.source_type" @change="g.self.source_value='';acClose()">
+                      <option value="skip">— пропустить</option>
+                      <option value="field">Поле Б24</option>
+                      <option value="formula">Формула</option>
+                      <option value="literal">Фиксированное</option>
+                      <option value="selector_map" x-show="g.self.variable_kind==='condition'">Selector map</option>
+                    </select>
+                    <div>
+                      <template x-if="g.self.source_type==='selector_map'">
+                        <textarea x-model="g.self.source_value" rows="2" style="font-family:var(--mono);font-size:11px;border-radius:6px;padding:6px 8px"></textarea>
+                      </template>
+                      <template x-if="g.self.source_type!=='selector_map' && g.self.source_type!=='skip'">
+                        <div class="ac-wrap">
+                          <input type="text" x-model="g.self.source_value"
+                            :placeholder="srcPh(g.self.source_type)"
+                            @focus="acOpen(g.self)" @input="acOpen(g.self)"
+                            @keydown.escape="acClose()"
+                            @keydown.down.prevent="acDown()"
+                            @keydown.up.prevent="acUp()"
+                            @keydown.enter.prevent="acPick(g.self)"
+                            autocomplete="off">
+                          <div class="ac-label" x-show="g.self.source_type==='field' && fLabel(g.self.source_value)" x-text="fLabel(g.self.source_value)"></div>
+                          <div class="ac-drop" x-show="acTarget===g.self.variable_id && acRes.length" @mousedown.prevent>
+                            <template x-for="(f,i) in acRes" :key="f.path">
+                              <div class="ac-item" :class="{focused:acIdx===i}" @click="g.self.source_value=f.path;acClose()">
+                                <div class="ac-item-label" x-text="f.label"></div>
+                                <div class="ac-item-path" x-html="acHL(f.path)"></div>
+                              </div>
+                            </template>
+                          </div>
+                        </div>
+                      </template>
+                      <div x-show="g.self.source_type==='skip'" style="height:32px"></div>
+                    </div>
+                    <button class="reset-btn" @click="g.self.source_type='skip';g.self.source_value='';acClose()" title="Сбросить">✕</button>
+                  </div>
+                </template>
+
+                <!-- Дочерние строки -->
+                <template x-for="m in g.kids" :key="m.variable_id">
+                  <div class="mrow child" :class="{filled:m.source_type!=='skip',skipped:m.source_type==='skip'}">
+                    <div class="row-n" x-text="m._n"></div>
+                    <div style="padding-left:10px;border-left:2px solid var(--border2)">
+                      <div class="var-name" x-text="m.variable_name"></div>
+                      <div class="var-id" x-text="'id: '+m.variable_id"></div>
+                      <div class="var-badges">
+                        <span :class="kindBadge(m.variable_kind)" x-text="m.variable_kind" style="font-size:10px"></span>
+                        <span x-show="m.variable_type" :class="typeBadge(m.variable_type)" x-text="m.variable_type" style="font-size:10px"></span>
+                      </div>
+                    </div>
+                    <select class="src-sel" x-model="m.source_type" @change="m.source_value='';acClose()">
+                      <option value="skip">— пропустить</option>
+                      <option value="field">Поле Б24</option>
+                      <option value="formula">Формула</option>
+                      <option value="literal">Фиксированное</option>
+                      <option value="selector_map" x-show="m.variable_kind==='condition'">Selector map</option>
+                    </select>
+                    <div>
+                      <template x-if="m.source_type==='selector_map'">
+                        <textarea x-model="m.source_value" rows="2" style="font-family:var(--mono);font-size:11px;border-radius:6px;padding:6px 8px"></textarea>
+                      </template>
+                      <template x-if="m.source_type!=='selector_map' && m.source_type!=='skip'">
+                        <div class="ac-wrap">
+                          <input type="text" x-model="m.source_value"
+                            :placeholder="srcPh(m.source_type)"
+                            @focus="acOpen(m)" @input="acOpen(m)"
+                            @keydown.escape="acClose()"
+                            @keydown.down.prevent="acDown()"
+                            @keydown.up.prevent="acUp()"
+                            @keydown.enter.prevent="acPick(m)"
+                            autocomplete="off">
+                          <div class="ac-label" x-show="m.source_type==='field' && fLabel(m.source_value)" x-text="fLabel(m.source_value)"></div>
+                          <div class="ac-drop" x-show="acTarget===m.variable_id && acRes.length" @mousedown.prevent>
+                            <template x-for="(f,i) in acRes" :key="f.path">
+                              <div class="ac-item" :class="{focused:acIdx===i}" @click="m.source_value=f.path;acClose()">
+                                <div class="ac-item-label" x-text="f.label"></div>
+                                <div class="ac-item-path" x-html="acHL(f.path)"></div>
+                              </div>
+                            </template>
+                          </div>
+                        </div>
+                      </template>
+                      <div x-show="m.source_type==='skip'" style="height:32px"></div>
+                    </div>
+                    <button class="reset-btn" @click="m.source_type='skip';m.source_value='';acClose()" title="Сбросить">✕</button>
+                  </div>
+                </template>
+
+              </div>
+            </div>
+          </template>
+
+        </div>
+        </template>
+      </div>
+    </template>
+    <!-- ══ END MAPPER ═════════════════════════════════════════════ -->
+
+    <!-- LOGS -->
+    <template x-if="pg==='logs'">
+      <div>
+        <h1 class="page-title">Логи генераций</h1>
+        <div x-show="logs.length===0" class="empty card">Генераций ещё не было.</div>
+        <div x-show="logs.length>0" class="card" style="padding:0;overflow:hidden">
+          <table class="tbl">
+            <thead><tr><th>Дата</th><th>Сделка</th><th>Шаблон</th><th>Документ</th><th>Статус</th></tr></thead>
+            <tbody>
+              <template x-for="l in logs" :key="l.id">
+                <tr>
+                  <td class="mono" style="white-space:nowrap" x-text="fmtD(l.created_at)"></td>
+                  <td x-text="'#'+l.deal_id"></td>
+                  <td class="mono" x-text="l.template_key"></td>
+                  <td>
+                    <div x-text="l.doc_name"></div>
+                    <a x-show="l.doc_link" :href="l.doc_link" target="_blank" style="font-size:11px">Открыть →</a>
+                  </td>
+                  <td>
+                    <span :class="l.status==='success'?'badge badge-green':'badge badge-red'" x-text="l.status"></span>
+                    <div x-show="l.error_message" style="font-size:11px;color:var(--danger);margin-top:2px" x-text="l.error_message"></div>
+                  </td>
+                </tr>
+              </template>
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </template>
+
+  </main>
+</div>
+</template>
+
+<!-- TEMPLATE MODAL -->
+<template x-if="showTmplModal">
+<div class="modal-bg" @click.self="showTmplModal=false">
+  <div class="modal">
+    <div class="modal-title" x-text="tForm.id?'Редактировать шаблон':'Новый шаблон'"></div>
+    <div x-show="tErr" class="alert alert-error" x-text="tErr"></div>
+    <div class="field"><label>Название</label><input type="text" x-model="tForm.name" placeholder="Договор оказания услуг"></div>
+    <div class="field"><label>Ключ (slug)</label>
+      <input type="text" x-model="tForm.key" placeholder="contract">
+      <div class="hint">Латиница, без пробелов — template_key в вебхуке</div></div>
+    <div class="field"><label>Doczilla File ID (recordId)</label><input type="text" x-model="tForm.doczilla_file_id" placeholder="XXXXXXXX-XXXX-XXXX-XXXX-XXXXXXXXXXXX"></div>
+    <div class="field"><label>Doczilla Link</label><input type="text" x-model="tForm.doczilla_link" placeholder="SVI8PZ"></div>
+    <div class="field"><label>Folder ID</label><input type="text" x-model="tForm.doczilla_folder_id"></div>
+    <div class="field"><label>Шаблон имени файла</label>
+      <input type="text" x-model="tForm.doc_name_template" placeholder="Договор {deal_id} от {date}">
+      <div class="hint">{deal_id}, {company}, {date}</div></div>
+    <div style="display:flex;gap:8px;justify-content:flex-end;margin-top:8px">
+      <button class="btn btn-ghost" @click="showTmplModal=false">Отмена</button>
+      <button class="btn btn-primary" @click="saveT()" :disabled="tLoading">
+        <span x-show="tLoading" class="spinner-sm"></span>Сохранить
+      </button>
+    </div>
+  </div>
+</div>
+</template>
+
+<!-- B24 FIELDS MODAL -->
+<template x-if="showB24">
+<div class="modal-bg" @click.self="showB24=false">
+  <div class="modal" style="width:600px">
+    <div class="modal-title">📋 Поля Битрикс24</div>
+    <div x-show="!b24Fields.length && !b24Loading" style="text-align:center;padding:20px">
+      <button class="btn btn-ghost" @click="loadB24()">Загрузить из Б24</button>
+    </div>
+    <div x-show="b24Loading" style="text-align:center;padding:20px;color:var(--muted)">Загрузка…</div>
+    <div x-show="b24Fields.length>0">
+      <input type="text" x-model="b24Q" placeholder="Поиск…" style="margin-bottom:10px" autofocus>
+      <div style="max-height:400px;overflow-y:auto">
+        <template x-for="f in filtB24" :key="f.path">
+          <div style="display:flex;justify-content:space-between;align-items:center;padding:7px 2px;border-bottom:1px solid var(--border)">
+            <div>
+              <div style="font-size:13px" x-text="f.label"></div>
+              <div class="mono" style="color:var(--muted)" x-text="f.path"></div>
+            </div>
+            <button class="btn btn-ghost btn-sm" @click="copyPath(f.path)">📋</button>
+          </div>
+        </template>
+      </div>
+    </div>
+    <div style="text-align:right;margin-top:12px">
+      <button class="btn btn-ghost" @click="showB24=false">Закрыть</button>
+    </div>
+  </div>
+</div>
+</template>
+
+<script>
+const API = '';
+
+function app() { return {
+  // auth
+  token: localStorage.getItem('adm_token')||'', me:null,
+  lf:{u:'',p:''}, loginErr:'', lLoading:false,
+
+  // nav
+  pg:'tmpl',
+
+  // templates
+  tmpls:[], showTmplModal:false, tForm:{}, tErr:'', tLoading:false,
+
+  // mapper
+  editTmpl:null, mappings:[],
+  loadingStruct:false, saving:false,
+  mAlert:'', mAlertT:'success',
+  mSearch:'', mFilt:'all',
+  collapsed: new Set(),
+  showHint:false,
+
+  // autocomplete
+  acTarget:null, acRes:[], acIdx:-1, _acQ:'',
+
+  // b24 fields
+  showB24:false, b24Fields:[], b24Loading:false, b24Q:'',
+
+  logs:[],
+
+  // ── init ──────────────────────────────────────────────────────
+  async init() {
+    if (this.token) { await this.loadMe(); await this.loadTmpls(); }
+  },
+
+  // ── auth ──────────────────────────────────────────────────────
+  async login() {
+    this.lLoading=true; this.loginErr='';
+    try {
+      const fd=new FormData(); fd.append('username',this.lf.u); fd.append('password',this.lf.p);
+      const r=await fetch(`${API}/admin/auth/login`,{method:'POST',body:fd});
+      const d=await r.json();
+      if(!r.ok) throw new Error(d.detail||'Ошибка');
+      this.token=d.access_token; localStorage.setItem('adm_token',this.token);
+      await this.loadMe(); await this.loadTmpls();
+    } catch(e){this.loginErr=e.message;} finally{this.lLoading=false;}
+  },
+  async loadMe(){
+    try{this.me=await this.req('GET','/admin/auth/me');}
+    catch{this.token='';localStorage.removeItem('adm_token');}
+  },
+  logout(){this.token='';localStorage.removeItem('adm_token');},
+
+  // ── templates ─────────────────────────────────────────────────
+  async loadTmpls(){this.tmpls=await this.req('GET','/admin/templates');},
+  openNew(){
+    this.tForm={key:'',name:'',doczilla_file_id:'',doczilla_link:'',
+      doczilla_folder_id:'00000000-0000-0000-0000-000000000000',
+      doc_name_template:'Документ {deal_id} от {date}',active:true};
+    this.tErr=''; this.showTmplModal=true;
+  },
+  editT(t){this.tForm={...t};this.tErr='';this.showTmplModal=true;},
+  async saveT(){
+    this.tLoading=true; this.tErr='';
+    try{
+      const m=this.tForm.id?'PUT':'POST';
+      const u=this.tForm.id?`/admin/templates/${this.tForm.id}`:'/admin/templates';
+      await this.req(m,u,this.tForm);
+      this.showTmplModal=false; await this.loadTmpls();
+    }catch(e){this.tErr=e.message;}finally{this.tLoading=false;}
+  },
+  async delT(id){
+    if(!confirm('Удалить шаблон и все маппинги?'))return;
+    await this.req('DELETE',`/admin/templates/${id}`); await this.loadTmpls();
+  },
+
+  // ── mapper ────────────────────────────────────────────────────
+  async openMapper(t){
+    this.editTmpl=t; this.mAlert=''; this.mSearch=''; this.mFilt='all';
+    this.collapsed=new Set(); this.acClose();
+    const raw=await this.req('GET',`/admin/templates/${t.id}/mappings`);
+    raw.forEach((m,i)=>m._n=i+1);
+    this.mappings=raw;
+    if(!this.b24Fields.length) this.loadB24();
+  },
+  closeMapper(){this.editTmpl=null;this.loadTmpls();},
+
+  async refreshStruct(){
+    this.loadingStruct=true; this.mAlert='';
+    try{
+      const r=await this.req('POST',`/admin/templates/${this.editTmpl.id}/refresh-structure`);
+      const raw=await this.req('GET',`/admin/templates/${this.editTmpl.id}/mappings`);
+      raw.forEach((m,i)=>m._n=i+1);
+      this.mappings=raw; this.collapsed=new Set();
+      this.mAlert=`Загружено ${r.count} переменных`; this.mAlertT='success';
+    }catch(e){this.mAlert='Ошибка: '+e.message;this.mAlertT='error';}
+    finally{this.loadingStruct=false;}
+  },
+
+  async saveMappings(){
+    this.saving=true; this.mAlert='';
+    try{
+      const p=this.mappings.map(m=>({variable_id:m.variable_id,source_type:m.source_type,source_value:m.source_value||''}));
+      await this.req('PUT',`/admin/templates/${this.editTmpl.id}/mappings`,p);
+      this.mAlert='Маппинг сохранён ✓'; this.mAlertT='success';
+    }catch(e){this.mAlert='Ошибка: '+e.message;this.mAlertT='error';}
+    finally{this.saving=false;}
+  },
+
+  toggleG(id){
+    const s=new Set(this.collapsed); s.has(id)?s.delete(id):s.add(id); this.collapsed=s;
+  },
+
+  // ── Computed stats ─────────────────────────────────────────────
+  get mStats(){
+    const a=this.mappings.filter(m=>m.variable_kind!=='selector');
+    const filled=a.filter(m=>m.source_type!=='skip').length;
+    const total=a.length;
+    return{total,filled,skipped:total-filled,pct:total?Math.round(filled/total*100):0};
+  },
+
+  // ── Filter chips ──────────────────────────────────────────────
+  get mChips(){
+    const m=this.mappings;
+    return[
+      {k:'all',      label:'Все',          n:m.length},
+      {k:'filled',   label:'✓ Настроено',  n:m.filter(x=>x.source_type!=='skip').length},
+      {k:'empty',    label:'○ Пропущено',  n:m.filter(x=>x.source_type==='skip').length},
+      {k:'variable', label:'variable',     n:m.filter(x=>x.variable_kind==='variable').length},
+      {k:'condition',label:'condition',    n:m.filter(x=>x.variable_kind==='condition').length},
+      {k:'selector', label:'selector',     n:m.filter(x=>x.variable_kind==='selector').length},
+    ];
+  },
+
+  // ── Grouped + filtered ────────────────────────────────────────
+  get filtGroups(){
+    const q=this.mSearch.toLowerCase().trim();
+    const f=this.mFilt;
+
+    // Определяем видимые id
+    const vis=new Set();
+    this.mappings.forEach(m=>{
+      const matchQ=!q||(m.variable_name.toLowerCase().includes(q)||String(m.variable_id).includes(q));
+      const matchF=f==='all'
+        ||( f==='filled'    && m.source_type!=='skip')
+        ||( f==='empty'     && m.source_type==='skip')
+        ||( f==='variable'  && m.variable_kind==='variable')
+        ||( f==='condition' && m.variable_kind==='condition')
+        ||( f==='selector'  && m.variable_kind==='selector');
+      if(matchQ&&matchF) vis.add(String(m.variable_id));
+    });
+    // Если видим ребёнка — показываем родителя
+    if(q||f!=='all'){
+      this.mappings.forEach(m=>{
+        if(m.parent_variable_id&&vis.has(String(m.variable_id)))
+          vis.add(String(m.parent_variable_id));
+      });
+    }
+
+    const icons={selector:'❓',replicator:'🔁',condition:'❔',variable:'📝'};
+    const groups=[];
+
+    this.mappings.forEach(m=>{
+      if(!vis.has(String(m.variable_id))) return;
+      if(m.parent_variable_id) return;
+
+      const kids=this.mappings.filter(c=>
+        String(c.parent_variable_id)===String(m.variable_id)&&vis.has(String(c.variable_id))
+      );
+      const isContainer=m.variable_kind==='selector'||m.variable_kind==='replicator';
+
+      groups.push({
+        id:m.variable_id,
+        name:m.variable_name,
+        kind:m.variable_kind,
+        selectorType:m.selector_type||null,
+        icon:icons[m.variable_kind]||'•',
+        self:isContainer?null:m,
+        kids,
+        totalN:kids.length,
+        filledN:kids.filter(c=>c.source_type!=='skip').length,
+      });
+    });
+
+    return groups;
+  },
+
+  // ── Autocomplete ──────────────────────────────────────────────
+  acOpen(m){
+    if(m.source_type!=='field'&&m.source_type!=='formula'){this.acClose();return;}
+    this.acTarget=m.variable_id; this.acIdx=-1;
+    this._acQ=m.source_value||'';
+    this._calcAc(m.source_value||'');
+  },
+  acClose(){this.acTarget=null;this.acRes=[];this.acIdx=-1;},
+  _calcAc(val){
+    if(!this.b24Fields.length){this.acRes=[];return;}
+    let q=val.toLowerCase();
+    const brace=q.match(/\{([^}]*)$/);
+    if(brace) q=brace[1];
+    this.acRes=q
+      ?this.b24Fields.filter(f=>f.path.toLowerCase().includes(q)||f.label.toLowerCase().includes(q)).slice(0,12)
+      :this.b24Fields.slice(0,10);
+  },
+  acDown(){this.acIdx=Math.min(this.acIdx+1,this.acRes.length-1);},
+  acUp(){this.acIdx=Math.max(this.acIdx-1,-1);},
+  acPick(m){
+    if(this.acIdx<0||!this.acRes[this.acIdx])return;
+    const path=this.acRes[this.acIdx].path;
+    const brace=m.source_value?.match(/^(.*\{)([^}]*)$/);
+    m.source_value=brace?brace[1]+path+'}':path;
+    this.acClose();
+  },
+  acHL(path){
+    const q=this._acQ.toLowerCase();
+    if(!q) return path;
+    return path.replace(new RegExp('('+q.replace(/[.*+?^${}()|[\]\\]/g,'\\$&')+')','gi'),'<em>$1</em>');
+  },
+  fLabel(path){
+    const f=this.b24Fields.find(x=>x.path===path);
+    return f?f.label:'';
+  },
+
+  // ── B24 fields ────────────────────────────────────────────────
+  async loadB24(){
+    this.b24Loading=true;
+    try{const r=await this.req('GET','/admin/bitrix/fields');this.b24Fields=r.fields;}
+    catch(e){console.warn(e);}
+    finally{this.b24Loading=false;}
+  },
+  get filtB24(){
+    const q=this.b24Q.toLowerCase();
+    return q?this.b24Fields.filter(f=>f.label.toLowerCase().includes(q)||f.path.toLowerCase().includes(q)):this.b24Fields;
+  },
+  copyPath(p){navigator.clipboard?.writeText(p);},
+
+  // ── logs ──────────────────────────────────────────────────────
+  async loadLogs(){this.logs=await this.req('GET','/admin/logs');},
+
+  // ── helpers ───────────────────────────────────────────────────
+  srcPh(t){return{field:'deal.TITLE',formula:'{deal.NAME} {contact.LAST_NAME}',literal:'Фиксированное значение'}[t]||'';},
+  kindBadge(k){return{variable:'badge badge-blue',condition:'badge badge-purple',selector:'badge badge-amber',replicator:'badge badge-teal'}[k]||'badge badge-gray';},
+  typeBadge(t){return{string:'badge badge-gray',number:'badge badge-blue',date:'badge badge-purple',money:'badge badge-green',boolean:'badge badge-amber',percent:'badge badge-amber',link:'badge badge-teal'}[t]||'badge badge-gray';},
+  fmtD(iso){if(!iso)return'—';return new Date(iso).toLocaleString('ru-RU',{day:'2-digit',month:'2-digit',hour:'2-digit',minute:'2-digit'});},
+
+  // ── api ───────────────────────────────────────────────────────
+  async req(method,path,body){
+    const o={method,headers:{Authorization:`Bearer ${this.token}`}};
+    if(body!==undefined){o.headers['Content-Type']='application/json';o.body=JSON.stringify(body);}
+    const r=await fetch(API+path,o);
+    if(r.status===204)return null;
+    const d=await r.json();
+    if(!r.ok)throw new Error(d.detail||JSON.stringify(d));
+    return d;
+  },
+};}
+</script>
+</body>
+</html>
