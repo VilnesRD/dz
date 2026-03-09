@@ -43,6 +43,7 @@ from app.core.config import get_settings
 log = logging.getLogger(__name__)
 router = APIRouter(prefix="/admin", tags=["admin"])
 settings = get_settings()
+DOCZILLA_ROOT_FOLDER_ID = "00000000-0000-0000-0000-000000000000"
 
 # ── JWT / Auth ────────────────────────────────────────────────────────────────
 SECRET_KEY  = os.environ.get("ADMIN_SECRET_KEY", "change-me-in-production-please")
@@ -145,6 +146,8 @@ async def list_published_doczilla_templates(
     section = (section_id or settings.DOCZILLA_TEMPLATES_SECTION_ID or "").strip()
     if not section:
         raise HTTPException(400, "Не указан section_id (передайте query или DOCZILLA_TEMPLATES_SECTION_ID в .env)")
+    _validate_doczilla_section_id(section)
+    log.info("doczilla published-templates: section_id=%s", section)
 
     client = DoczillaClient()
     try:
@@ -187,6 +190,8 @@ async def import_doczilla_templates(
     section = (body.section_id or settings.DOCZILLA_TEMPLATES_SECTION_ID or "").strip()
     if not section:
         raise HTTPException(400, "Не указан section_id (body.section_id или DOCZILLA_TEMPLATES_SECTION_ID)")
+    _validate_doczilla_section_id(section)
+    log.info("doczilla import: section_id=%s folder_override=%s", section, body.doczilla_folder_id)
 
     client = DoczillaClient()
     try:
@@ -526,3 +531,16 @@ def _unique_key(db: Session, base: str) -> str:
         key = f"{base}-{i}"
         i += 1
     return key
+
+
+def _validate_doczilla_section_id(section_id: str) -> None:
+    """
+    section_id в Doczilla — это ID раздела, не folderId.
+    Частая ошибка: передают root folderId (0000...).
+    """
+    if section_id.strip() == DOCZILLA_ROOT_FOLDER_ID:
+        raise HTTPException(
+            400,
+            "Передан folderId root (0000...), а нужен section_id раздела Doczilla. "
+            "Используйте section вроде 039BC112-E801-4F82-BA21-484F72500736.",
+        )
