@@ -250,36 +250,43 @@
 </div>
 
 <script>
-// ── Параметры из URL (Б24 передаёт их автоматически) ──────────────────────────
-const params  = new URLSearchParams(window.location.search);
-const DEAL_ID = params.get('DEAL_ID') || params.get('deal_id') || '';
-const DOMAIN  = params.get('DOMAIN')  || '';
-const TOKEN   = params.get('AUTH_ID') || params.get('auth[access_token]') || '';
-
-// URL бэкенда — при деплое замените на реальный домен
-// В dev-режиме работает через ngrok или localhost
+// ── Контекст Б24 (query + BX24 SDK) ──────────────────────────────────────────
+const params = new URLSearchParams(window.location.search);
 const API_BASE = window.location.origin;
+const ctx = {
+  dealId: '',
+  domain: '',
+  token: '',
+};
 
 // ── Инициализация ─────────────────────────────────────────────────────────────
 document.addEventListener('DOMContentLoaded', async () => {
-  // Показать ID сделки в pill
-  document.getElementById('dealPill').innerHTML =
-    `<span></span> Сделка #${DEAL_ID || '—'}`;
-
-  // Загрузить список шаблонов с бэкенда
+  await initContext();
+  renderDealPill();
   await loadTemplates();
 
-  // Активировать кнопку при выборе шаблона
   document.getElementById('templateSelect').addEventListener('change', () => {
-    document.getElementById('generateBtn').disabled = false;
+    updateGenerateButtonState();
   });
+
+  updateGenerateButtonState();
+
+  if (!ctx.dealId) {
+    showError('Не удалось определить ID сделки. Откройте виджет из карточки сделки.');
+  }
 });
 
 async function loadTemplates() {
   try {
     const res = await fetch(`${API_BASE}/api/widget-config`);
+    if (!res.ok) throw new Error(`HTTP ${res.status}`);
     const data = await res.json();
     const sel = document.getElementById('templateSelect');
+
+    if (!Array.isArray(data.templates) || data.templates.length === 0) {
+      showError('Нет активных шаблонов. Добавьте шаблон в админ-панели.');
+      return;
+    }
 
     data.templates.forEach(t => {
       const opt = document.createElement('option');
@@ -287,6 +294,11 @@ async function loadTemplates() {
       opt.textContent = t.name;
       sel.appendChild(opt);
     });
+
+    const preselected = params.get('TEMPLATE_KEY') || '';
+    if (preselected && data.templates.some(t => t.key === preselected)) {
+      sel.value = preselected;
+    }
   } catch (e) {
     showError('Не удалось загрузить список шаблонов: ' + e.message);
   }
@@ -297,7 +309,7 @@ async function generate() {
   const templateKey = document.getElementById('templateSelect').value;
   if (!templateKey) return;
 
-  if (!DEAL_ID) {
+  if (!ctx.dealId) {
     showError('Не удалось определить ID сделки. Откройте виджет из карточки сделки.');
     return;
   }
@@ -315,11 +327,10 @@ async function generate() {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
-        deal_id: DEAL_ID,
+        deal_id: ctx.dealId,
         template_key: templateKey,
-        // Передаём токен Б24 — бэкенд может использовать его для on-behalf запросов
-        bitrix_token: TOKEN,
-        bitrix_domain: DOMAIN,
+        bitrix_token: ctx.token,
+        bitrix_domain: ctx.domain,
       }),
     });
 
@@ -379,7 +390,7 @@ function showError(msg) {
   const el = document.getElementById('statusError');
   el.textContent = msg;
   el.style.display = 'block';
-  document.getElementById('generateBtn').disabled = false;
+  updateGenerateButtonState();
   document.getElementById('templateSelect').disabled = false;
 }
 
@@ -387,17 +398,145 @@ function escHtml(str) {
   return String(str).replace(/[&<>"']/g, c =>
     ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
 }
+
+function updateGenerateButtonState() {
+  const hasTemplate = !!document.getElementById('templateSelect').value;
+  document.getElementById('generateBtn').disabled = !(hasTemplate && !!ctx.dealId);
+}
+
+function renderDealPill() {
+  document.getElementById('dealPill').innerHTML = `<span></span> Сделка #${ctx.dealId || '—'}`;
+}
+
+async function initContext() {
+  const placementOptions = safeJsonParse(params.get('PLACEMENT_OPTIONS'));
+  ctx.dealId = firstNonEmpty(
+    params.get('DEAL_ID'),
+    params.get('deal_id'),
+    params.get('ID'),
+    params.get('ENTITY_ID'),
+    params.get('ENTITY_VALUE_ID'),
+    extractDealId(placementOptions),
+  );
+  ctx.domain = normalizeDomain(firstNonEmpty(
+    params.get('DOMAIN'),
+    params.get('domain'),
+    params.get('auth[domain]'),
+  ));
+  ctx.token = firstNonEmpty(
+    params.get('AUTH_ID'),
+    params.get('auth[access_token]'),
+    params.get('AUTH'),
+  );
+
+  if (!window.BX24) return;
+
+  await bx24Init();
+
+  const [placementInfo, auth] = await Promise.all([
+    bx24PlacementInfo(),
+    bx24Auth(),
+  ]);
+
+  const optionsFromSdk = safeJsonParse(placementInfo && placementInfo.options);
+  ctx.dealId = firstNonEmpty(
+    ctx.dealId,
+    extractDealId(optionsFromSdk),
+    extractDealId(placementInfo),
+  );
+  ctx.domain = normalizeDomain(firstNonEmpty(
+    ctx.domain,
+    auth && auth.domain,
+    placementInfo && placementInfo.serverAddress,
+  ));
+  ctx.token = firstNonEmpty(
+    ctx.token,
+    auth && auth.access_token,
+  );
+
+  if (window.BX24 && typeof BX24.fitWindow === 'function') {
+    BX24.fitWindow();
+  }
+}
+
+function firstNonEmpty(...values) {
+  for (const value of values) {
+    if (value === null || value === undefined) continue;
+    const text = String(value).trim();
+    if (text) return text;
+  }
+  return '';
+}
+
+function normalizeDomain(value) {
+  if (!value) return '';
+  return String(value)
+    .replace(/^https?:\/\//i, '')
+    .split('/')[0]
+    .trim();
+}
+
+function safeJsonParse(value) {
+  if (!value) return {};
+  if (typeof value === 'object') return value;
+  try {
+    return JSON.parse(String(value));
+  } catch (e) {
+    return {};
+  }
+}
+
+function extractDealId(source) {
+  if (!source || typeof source !== 'object') return '';
+  return firstNonEmpty(
+    source.ID,
+    source.id,
+    source.DEAL_ID,
+    source.deal_id,
+    source.dealId,
+    source.ENTITY_ID,
+    source.entityId,
+    source.ENTITY_VALUE_ID,
+    source.entityValueId,
+  );
+}
+
+function bx24Init() {
+  return new Promise(resolve => {
+    try {
+      BX24.init(resolve);
+    } catch (e) {
+      resolve();
+    }
+  });
+}
+
+function bx24PlacementInfo() {
+  return new Promise(resolve => {
+    try {
+      if (!BX24.placement || typeof BX24.placement.info !== 'function') {
+        return resolve({});
+      }
+      BX24.placement.info(info => resolve(info || {}));
+    } catch (e) {
+      resolve({});
+    }
+  });
+}
+
+function bx24Auth() {
+  return new Promise(resolve => {
+    try {
+      if (typeof BX24.getAuth !== 'function') return resolve({});
+      BX24.getAuth(auth => resolve(auth || {}));
+    } catch (e) {
+      resolve({});
+    }
+  });
+}
 </script>
 
 <!-- Б24 JS SDK (доступен только при открытии внутри Б24) -->
 <script src="//api.bitrix24.com/api/v1/"></script>
-<script>
-  if (window.BX24) {
-    BX24.init(() => {
-      // Подогнать высоту iframe под контент
-      BX24.fitWindow();
-    });
-  }
-</script>
 </body>
 </html>

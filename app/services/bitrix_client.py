@@ -31,11 +31,21 @@ class BitrixClient:
         self._client = httpx.AsyncClient(timeout=30.0)
         # domain = портал Б24 (например crm-test.doczilla.pro)
         # если None — используем вебхук из конфига
-        self._domain = domain
+        self._domain = self._normalize_domain(domain)
         self._base = settings.BITRIX_WEBHOOK_URL.rstrip("/")
 
     async def close(self):
         await self._client.aclose()
+
+    @staticmethod
+    def _normalize_domain(domain: str | None) -> str | None:
+        """Привести DOMAIN к виду portal.bitrix24.ru без протокола и пути."""
+        if not domain:
+            return None
+        value = str(domain).strip()
+        value = value.replace("https://", "").replace("http://", "")
+        value = value.split("/", 1)[0]
+        return value or None
 
     # ── OAuth helpers ─────────────────────────────────────────────────────────
 

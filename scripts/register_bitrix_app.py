@@ -46,21 +46,22 @@ async def register():
         base = settings.BITRIX_WEBHOOK_URL.rstrip("/")
 
         # ── 1. Регистрация placement (кнопка в тулбаре карточки сделки) ──────
-        print("Регистрируем placement CRM_DEAL_TOOLBAR...")
-        res = await client.post(f"{base}/placement.bind.json", json={
-            "PLACEMENT": "CRM_DEAL_TOOLBAR",     # кнопка в шапке сделки
-            "HANDLER":   WIDGET_URL,
-            "TITLE":     "📄 Создать документ",  # текст кнопки
-            "DESCRIPTION": "Генерация PDF через Doczilla PRO",
-            "OPTIONS": {
-                "extranet": "N",   # не показывать экстранет-пользователям
-            }
-        })
-        data = res.json()
-        if data.get("result") is True:
-            print("✅ Кнопка зарегистрирована в тулбаре сделки!")
-        else:
-            print(f"⚠️  Ответ Б24: {data}")
+        for placement in ("CRM_DEAL_TOOLBAR", "CRM_DEAL_DETAIL_TOOLBAR"):
+            print(f"Регистрируем placement {placement}...")
+            res = await client.post(f"{base}/placement.bind.json", json={
+                "PLACEMENT": placement,
+                "HANDLER":   WIDGET_URL,
+                "TITLE":     "📄 Создать документ",
+                "DESCRIPTION": "Генерация PDF через Doczilla PRO",
+                "OPTIONS": {
+                    "extranet": "N",   # не показывать экстранет-пользователям
+                }
+            })
+            data = res.json()
+            if data.get("result") is True:
+                print(f"✅ Placement {placement} зарегистрирован")
+            else:
+                print(f"⚠️  Ответ Б24 ({placement}): {data}")
 
         # ── 2. Опционально: вкладка в карточке сделки ─────────────────────────
         # Раскомментируй если хочешь вкладку вместо/помимо кнопки
@@ -93,7 +94,6 @@ async def unregister():
             return
 
         for p in placements:
-            placement_id = p.get("id") or p.get("placement")
             res2 = await client.post(f"{base}/placement.unbind.json", json={
                 "PLACEMENT": p.get("placement"),
                 "HANDLER":   p.get("handler"),

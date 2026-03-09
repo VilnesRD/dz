@@ -12,12 +12,10 @@ FastAPI — точка входа.
     /admin/*                  — REST API админ-панели
 """
 import logging
-import os
 from contextlib import asynccontextmanager
 from pathlib import Path
-from typing import Annotated
 
-from fastapi import Depends, FastAPI, HTTPException, Request, BackgroundTasks
+from fastapi import FastAPI, HTTPException, Request, BackgroundTasks
 from fastapi.responses import FileResponse, HTMLResponse
 from pydantic import BaseModel
 
@@ -85,18 +83,28 @@ app.include_router(admin_router)
 app.include_router(widget_router)
 
 
-# ── DI ────────────────────────────────────────────────────────────────────────
-def get_bitrix():
-    return _bitrix_client
+def _pick(*values):
+    for value in values:
+        if value:
+            return str(value)
+    return None
 
-def get_doczilla():
-    return _doczilla_client
 
-def get_service(
-    b: Annotated[BitrixClient,   Depends(get_bitrix)],
-    d: Annotated[DoczillaClient, Depends(get_doczilla)],
-) -> DocumentGenerationService:
-    return DocumentGenerationService(b, d)
+def _build_generation_service(bitrix_domain: str | None = None) -> tuple[DocumentGenerationService, bool]:
+    """
+    Вернуть сервис генерации и флаг, нужно ли закрыть BitrixClient после запроса.
+    """
+    if _doczilla_client is None:
+        raise RuntimeError("DoczillaClient не инициализирован")
+
+    # Для локального приложения важен domain портала: только так можно достать OAuth токены.
+    if bitrix_domain:
+        bitrix = BitrixClient(domain=bitrix_domain)
+        return DocumentGenerationService(bitrix, _doczilla_client), True
+
+    if _bitrix_client is None:
+        raise RuntimeError("BitrixClient не инициализирован")
+    return DocumentGenerationService(_bitrix_client, _doczilla_client), False
 
 
 # ── Роуты ─────────────────────────────────────────────────────────────────────
@@ -120,7 +128,6 @@ async def bitrix_webhook_get():
 async def bitrix_webhook(
     request: Request,
     bg: BackgroundTasks,
-    svc: Annotated[DocumentGenerationService, Depends(get_service)],
 ):
     """
     Вебхук от Б24 при нажатии кнопки в карточке сделки.
@@ -139,22 +146,35 @@ async def bitrix_webhook(
         or form.get("TEMPLATE_KEY")
         or "contract"
     )
+    bitrix_domain = _pick(
+        form.get("DOMAIN"),
+        form.get("domain"),
+        form.get("auth[domain]"),
+    )
 
     if not deal_id:
         raise HTTPException(400, "Отсутствует deal_id")
 
-    bg.add_task(_run_generation, svc, str(deal_id), template_key)
-    return {"status": "accepted", "deal_id": deal_id, "template": template_key}
+    bg.add_task(_run_generation, str(deal_id), template_key, bitrix_domain)
+    return {
+        "status": "accepted",
+        "deal_id": deal_id,
+        "template": template_key,
+        "domain": bitrix_domain,
+    }
 
 
-async def _run_generation(svc: DocumentGenerationService, deal_id: str, template_key: str):
+async def _run_generation(deal_id: str, template_key: str, bitrix_domain: str | None = None):
     from app.db.database import SessionLocal
     from app.db import repository as repo
 
     with SessionLocal() as db:
         log_entry = repo.create_log(db, deal_id=deal_id, template_key=template_key, status="pending")
 
+    svc: DocumentGenerationService | None = None
+    owns_bitrix_client = False
     try:
+        svc, owns_bitrix_client = _build_generation_service(bitrix_domain)
         result = await svc.generate_for_deal(deal_id, template_key)
         with SessionLocal() as db:
             repo.update_log(db, log_entry.id,
@@ -169,6 +189,9 @@ async def _run_generation(svc: DocumentGenerationService, deal_id: str, template
         with SessionLocal() as db:
             repo.update_log(db, log_entry.id, status="error", error_message=str(e))
         logger.error("❌ deal=%s: %s", deal_id, e)
+    finally:
+        if owns_bitrix_client and svc:
+            await svc.bitrix.close()
 
 
 # ── Ручной запуск для тестов ──────────────────────────────────────────────────
@@ -176,15 +199,17 @@ async def _run_generation(svc: DocumentGenerationService, deal_id: str, template
 class GenerateRequest(BaseModel):
     deal_id: str
     template_key: str = "contract"
+    bitrix_domain: str | None = None
+    bitrix_token: str | None = None  # может быть передан из iframe Б24, но не обязателен
 
 
 @app.post("/api/generate")
-async def manual_generate(
-    req: GenerateRequest,
-    svc: Annotated[DocumentGenerationService, Depends(get_service)],
-):
+async def manual_generate(req: GenerateRequest):
     """Ручной запуск — для тестирования без Б24."""
+    svc: DocumentGenerationService | None = None
+    owns_bitrix_client = False
     try:
+        svc, owns_bitrix_client = _build_generation_service(req.bitrix_domain)
         result = await svc.generate_for_deal(req.deal_id, req.template_key)
         return {
             "status": "success",
@@ -196,3 +221,8 @@ async def manual_generate(
         raise HTTPException(404, str(e))
     except (BitrixError, DoczillaError) as e:
         raise HTTPException(502, str(e))
+    except RuntimeError as e:
+        raise HTTPException(503, str(e))
+    finally:
+        if owns_bitrix_client and svc:
+            await svc.bitrix.close()
