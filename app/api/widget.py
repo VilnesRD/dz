@@ -85,7 +85,7 @@ async def install_post(request: Request):
                     f"https://{domain}/rest/placement.bind.json",
                     params={"auth": auth_id},
                     json={
-                        "PLACEMENT": "CRM_DEAL_TOOLBAR",
+                        "PLACEMENT": "CRM_DEAL_DETAIL_TOOLBAR",
                         "HANDLER":   widget_url,
                         "TITLE":     "📄 Создать документ",
                     }
