@@ -44,6 +44,50 @@ def _safe_int(value, default: int = 3600) -> int:
         return default
 
 
+def _iter_placements(raw_result):
+    """
+    Нормализовать result метода placement.list к парам (placement, handler|None).
+    Порталы Б24 могут возвращать list[dict], list[str] или dict.
+    """
+    if isinstance(raw_result, list):
+        for item in raw_result:
+            if isinstance(item, dict):
+                placement = item.get("placement") or item.get("PLACEMENT") or item.get("id")
+                handler = item.get("handler") or item.get("HANDLER")
+                if placement:
+                    yield str(placement), (str(handler) if handler else None)
+            elif isinstance(item, str):
+                yield item, None
+        return
+
+    if isinstance(raw_result, dict):
+        if raw_result.get("placement") or raw_result.get("PLACEMENT"):
+            placement = raw_result.get("placement") or raw_result.get("PLACEMENT")
+            handler = raw_result.get("handler") or raw_result.get("HANDLER")
+            yield str(placement), (str(handler) if handler else None)
+            return
+
+        for placement, value in raw_result.items():
+            if isinstance(value, list):
+                if not value:
+                    yield str(placement), None
+                for entry in value:
+                    if isinstance(entry, dict):
+                        handler = entry.get("handler") or entry.get("HANDLER") or entry.get("value")
+                        yield str(placement), (str(handler) if handler else None)
+                    elif isinstance(entry, str):
+                        yield str(placement), entry
+                    else:
+                        yield str(placement), None
+            elif isinstance(value, dict):
+                handler = value.get("handler") or value.get("HANDLER") or value.get("value")
+                yield str(placement), (str(handler) if handler else None)
+            elif isinstance(value, str):
+                yield str(placement), value
+            else:
+                yield str(placement), None
+
+
 async def _process_install_payload(params: dict, form: dict) -> None:
     domain = _normalize_domain(_pick(
         params.get("DOMAIN"),
@@ -104,25 +148,23 @@ async def _process_install_payload(params: dict, form: dict) -> None:
             placements = []
 
         target_placements = {"CRM_DEAL_DETAIL_TOOLBAR"}
-        for item in placements:
-            placement_name = str(item.get("placement") or "")
-            handler = str(item.get("handler") or "")
+        for placement_name, handler in _iter_placements(placements):
             if placement_name not in target_placements:
                 continue
 
+            payload = {"PLACEMENT": placement_name}
+            if handler:
+                payload["HANDLER"] = handler
             unbind_resp = await client.post(
                 f"https://{domain}/rest/placement.unbind.json",
                 params={"auth": auth_id},
-                json={
-                    "PLACEMENT": placement_name,
-                    "HANDLER": handler,
-                },
+                json=payload,
             )
             try:
                 unbind_data = unbind_resp.json()
             except Exception:
                 unbind_data = {"status_code": unbind_resp.status_code}
-            logger.info("placement.unbind %s (%s): %s", placement_name, handler, unbind_data)
+            logger.info("placement.unbind %s (%s): %s", placement_name, handler or "no-handler", unbind_data)
 
         r = await client.post(
             f"https://{domain}/rest/placement.bind.json",
