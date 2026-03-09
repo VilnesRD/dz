@@ -51,6 +51,8 @@ async def install_post(request: Request):
     """
     params = dict(request.query_params)
     form   = dict(await request.form())
+    logger.info("install POST query_params: %s", params)
+    logger.info("install POST form body: %s", form)
     code   = params.get("code") or form.get("code")
     domain = params.get("DOMAIN") or params.get("domain") or form.get("DOMAIN") or form.get("domain")
 
