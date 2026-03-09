@@ -11,6 +11,7 @@ RUN pip install --no-cache-dir -r requirements.txt
 
 # Код приложения
 COPY app/ ./app/
+COPY scripts/ ./scripts/
 
 # Директория для SQLite и данных
 RUN mkdir -p /app/data
