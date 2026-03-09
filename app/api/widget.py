@@ -254,9 +254,15 @@ async def serve_widget_get(request: Request):
     return FileResponse(STATIC_DIR / "widget.html", media_type="text/html", headers=NO_CACHE_HEADERS)
 
 
+@router.get("/assets/doczilla-logo.png", include_in_schema=False)
+async def serve_doczilla_logo_png():
+    return FileResponse(STATIC_DIR / "doczilla-pink-32x32.png", media_type="image/png", headers=NO_CACHE_HEADERS)
+
+
 @router.get("/assets/doczilla-logo.svg", include_in_schema=False)
-async def serve_doczilla_logo():
-    return FileResponse(STATIC_DIR / "doczilla-logo.svg", media_type="image/svg+xml", headers=NO_CACHE_HEADERS)
+async def serve_doczilla_logo_svg_alias():
+    # Backward compatibility for older frontend that still requests .svg
+    return FileResponse(STATIC_DIR / "doczilla-pink-32x32.png", media_type="image/png", headers=NO_CACHE_HEADERS)
 
 
 @router.post("/bitrix/widget", response_class=FileResponse, include_in_schema=False)
@@ -307,7 +313,16 @@ async def widget_config():
     """Список активных шаблонов для выпадающего списка в виджете."""
     with SessionLocal() as db:
         templates = repo.list_templates(db)
-    active = [{"key": t.key, "name": t.name} for t in templates if t.active]
+    active = [
+        {
+            "key": t.key,
+            "name": t.name,
+            "result_mode": (getattr(t, "bitrix_result_mode", "both") or "both"),
+            "save_link_field": (getattr(t, "bitrix_deal_link_field", "") or ""),
+            "save_pdf_field": (getattr(t, "bitrix_deal_pdf_field", "") or ""),
+        }
+        for t in templates if t.active
+    ]
     logger.info("widget-config: active templates=%d", len(active))
     return {"templates": active}
 

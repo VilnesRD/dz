@@ -174,6 +174,9 @@ async def manual_generate(req: GenerateRequest):
             "doc_id": result.doc_id,
             "doc_link": result.doc_link,
             "doc_name": result.doc_name,
+            "result_mode": result.result_mode,
+            "save_link": result.save_link,
+            "save_pdf": result.save_pdf,
             "warnings": result.warnings,
         }
     except KeyError as e:

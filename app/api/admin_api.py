@@ -759,7 +759,62 @@ def _extract_bitrix_fields(payload: Any) -> dict[str, dict]:
 def _extract_localized_label(value: Any) -> str:
     if isinstance(value, str):
         return value.strip()
+    if isinstance(value, (list, tuple)):
+        # Б24 может вернуть мультиязычные подписи как массив объектов:
+        # [{"LANG":"ru","VALUE":"..."}, {"LANG":"en","VALUE":"..."}]
+        preferred: list[str] = []
+        fallback: list[str] = []
+        for row in value:
+            if not isinstance(row, dict):
+                label = _extract_localized_label(row)
+                if label:
+                    fallback.append(label)
+                continue
+            lang = str(
+                row.get("LANG")
+                or row.get("lang")
+                or row.get("language")
+                or ""
+            ).strip().lower()
+            raw = (
+                row.get("VALUE")
+                or row.get("value")
+                or row.get("TEXT")
+                or row.get("text")
+                or row.get("LABEL")
+                or row.get("label")
+                or row.get("TITLE")
+                or row.get("title")
+                or row.get("NAME")
+                or row.get("name")
+            )
+            label = _extract_localized_label(raw)
+            if not label:
+                continue
+            if lang.startswith("ru"):
+                preferred.append(label)
+            else:
+                fallback.append(label)
+        if preferred:
+            return preferred[0]
+        if fallback:
+            return fallback[0]
+        return ""
     if isinstance(value, dict):
+        direct = (
+            value.get("VALUE")
+            or value.get("value")
+            or value.get("TEXT")
+            or value.get("text")
+            or value.get("LABEL")
+            or value.get("label")
+            or value.get("TITLE")
+            or value.get("title")
+            or value.get("NAME")
+            or value.get("name")
+        )
+        if isinstance(direct, str) and direct.strip():
+            return direct.strip()
         for key in ("ru", "ru_RU", "en", "en_US"):
             val = value.get(key)
             if isinstance(val, str) and val.strip():
@@ -874,7 +929,27 @@ def _resolve_userfield_title(code: Any, meta: Any, uf_labels: dict[str, str]) ->
         return map_label
     if meta_label:
         return meta_label
-    return norm_code
+    return _humanize_uf_fallback_title(norm_code)
+
+
+def _humanize_uf_fallback_title(code: str) -> str:
+    """
+    Человекочитаемый fallback для UF-полей, если Б24 не вернул label.
+    """
+    norm = _normalize_uf_code(code)
+    if not norm:
+        return "Пользовательское поле"
+    if not norm.startswith("UF_"):
+        return norm
+
+    tail = norm[3:]
+    if tail.startswith("CRM_"):
+        tail = tail[4:]
+    tail = tail.strip("_")
+    if not tail:
+        return "Пользовательское поле"
+
+    return f"Пользовательское поле {tail}"
 
 
 def _normalize_user_type_id(value: Any) -> str:
@@ -989,6 +1064,12 @@ async def _load_crm_entity_fields(
         legacy_code = _to_legacy_field_code(code)
         if not legacy_code:
             continue
+        # Для UF_* используем каноничные коды из legacy crm.*.fields.
+        # В crm.item.fields коды UF приходят в camelCase и при конвертации могут
+        # давать некорректные артефакты вроде UF_CRM_683_ED_... — такие ключи
+        # недопустимы для дальнейшего crm.*.get маппинга.
+        if legacy_code.startswith("UF_") and legacy_code not in legacy_fields:
+            continue
         if not isinstance(meta, dict):
             meta = {}
         existing = item_fields_legacy.get(legacy_code)
@@ -1024,6 +1105,16 @@ def _to_legacy_field_code(code: Any) -> str:
         return ""
     if text.upper() == text:
         return text
+
+    # Спец-случай для кастомных полей UF_CRM_* из crm.item.fields (обычно ufCrmXxx).
+    # Нельзя разбивать буквенно-числовой хвост доп. "_", иначе получается
+    # несуществующий код поля в crm.*.get.
+    if text.startswith("ufCrm") or text.startswith("UFCRM") or text.startswith("ufcrm"):
+        tail = text[5:]
+        tail = re.sub(r"[^A-Za-z0-9_]", "", tail)
+        if not tail:
+            return "UF_CRM"
+        return f"UF_CRM_{tail.upper()}"
 
     # camelCase -> snake_case
     snake = re.sub(r"([a-z0-9])([A-Z])", r"\1_\2", text)

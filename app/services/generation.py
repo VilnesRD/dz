@@ -34,6 +34,9 @@ class GenerationResult:
     doc_link: str
     doc_name: str
     template_id: int
+    result_mode: str
+    save_link: bool
+    save_pdf: bool
     warnings: list[str]
 
 
@@ -179,6 +182,9 @@ class DocumentGenerationService:
             doc_link=doc_link,
             doc_name=doc_name,
             template_id=template.id,
+            result_mode=result_mode,
+            save_link=save_link,
+            save_pdf=save_pdf,
             warnings=warnings,
         )
 

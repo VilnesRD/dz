@@ -181,6 +181,24 @@
     padding: 0;
     font-family: inherit;
   }
+  .inline-actions {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+    margin-top: 10px;
+  }
+  .inline-btn {
+    border: 1px solid currentColor;
+    background: transparent;
+    color: inherit;
+    border-radius: 6px;
+    padding: 6px 10px;
+    font-size: 12px;
+    font-weight: 700;
+    cursor: pointer;
+    font-family: inherit;
+  }
+  .inline-btn:hover { opacity: .88; }
 
   /* ── Spinner ── */
   .spinner {
@@ -221,7 +239,7 @@
 
 <div class="card">
   <div class="header">
-    <div class="logo"><img src="/assets/doczilla-logo.svg" alt="Doczilla"></div>
+    <div class="logo"><img src="/assets/doczilla-logo.png" alt="Doczilla"></div>
     <div class="header-text">
       <h1>Doczilla PRO</h1>
       <p>Генерация документа из сделки</p>
@@ -246,7 +264,7 @@
       <line x1="12" y1="18" x2="12" y2="12"/>
       <line x1="9" y1="15" x2="15" y2="15"/>
     </svg>
-    Сгенерировать PDF
+    <span id="generateBtnLabel">Сгенерировать PDF</span>
   </button>
 
   <!-- Прогресс шагов -->
@@ -254,8 +272,8 @@
     <div class="step" id="s1"><div class="step-dot"></div> Получение данных из Б24</div>
     <div class="step" id="s2"><div class="step-dot"></div> Создание анкеты в Doczilla</div>
     <div class="step" id="s3"><div class="step-dot"></div> Заполнение переменных</div>
-    <div class="step" id="s4"><div class="step-dot"></div> Генерация PDF</div>
-    <div class="step" id="s5"><div class="step-dot"></div> Сохранение ссылки в сделку</div>
+    <div class="step" id="s4"><div class="step-dot"></div> Генерация результата</div>
+    <div class="step" id="s5"><div class="step-dot"></div> Сохранение результата в сделку</div>
   </div>
 
   <div class="status" id="statusLoading">
@@ -276,7 +294,7 @@ const ctx = {
   domain: '',
   token: '',
 };
-let autoCloseTimer = null;
+const templateMetaByKey = new Map();
 let autoCloseTicker = null;
 
 // ── Инициализация ─────────────────────────────────────────────────────────────
@@ -295,9 +313,11 @@ document.addEventListener('DOMContentLoaded', async () => {
   await loadTemplates();
 
   document.getElementById('templateSelect').addEventListener('change', () => {
+    applyTemplateModeUI(getSelectedTemplateMode());
     updateGenerateButtonState();
   });
 
+  applyTemplateModeUI(getSelectedTemplateMode());
   updateGenerateButtonState();
 
   if (!ctx.dealId) {
@@ -311,6 +331,7 @@ async function loadTemplates() {
     if (!res.ok) throw new Error(`HTTP ${res.status}`);
     const data = await res.json();
     const sel = document.getElementById('templateSelect');
+    templateMetaByKey.clear();
 
     if (!Array.isArray(data.templates) || data.templates.length === 0) {
       showError('Нет активных шаблонов. Добавьте шаблон в админ-панели.');
@@ -318,6 +339,11 @@ async function loadTemplates() {
     }
 
     data.templates.forEach(t => {
+      templateMetaByKey.set(String(t.key), {
+        result_mode: normalizeResultMode(t.result_mode),
+        save_link_field: String(t.save_link_field || '').trim(),
+        save_pdf_field: String(t.save_pdf_field || '').trim(),
+      });
       const opt = document.createElement('option');
       opt.value = t.key;
       opt.textContent = t.name;
@@ -327,23 +353,76 @@ async function loadTemplates() {
     const preselected = params.get('TEMPLATE_KEY') || '';
     if (preselected && data.templates.some(t => t.key === preselected)) {
       sel.value = preselected;
+    } else if (data.templates[0]) {
+      sel.value = data.templates[0].key;
     }
+    applyTemplateModeUI(getSelectedTemplateMode());
   } catch (e) {
     showError('Не удалось загрузить список шаблонов: ' + e.message);
   }
+}
+
+function normalizeResultMode(value) {
+  const mode = String(value || '').trim().toLowerCase();
+  return (mode === 'link' || mode === 'pdf' || mode === 'both') ? mode : 'both';
+}
+
+function getSelectedTemplateMeta() {
+  const key = String(document.getElementById('templateSelect').value || '').trim();
+  return templateMetaByKey.get(key) || { result_mode: 'both', save_link_field: '', save_pdf_field: '' };
+}
+
+function getSelectedTemplateMode() {
+  return normalizeResultMode(getSelectedTemplateMeta().result_mode);
+}
+
+function modeButtonTitle(mode) {
+  if (mode === 'link') return 'Создать документ';
+  if (mode === 'pdf') return 'Сгенерировать PDF';
+  return 'Сгенерировать PDF';
+}
+
+function modeStep4Title(mode) {
+  return mode === 'link' ? 'Финализация документа' : 'Генерация PDF';
+}
+
+function modeStep5Title(mode, meta = getSelectedTemplateMeta()) {
+  const hasLink = !!String(meta.save_link_field || '').trim();
+  const hasPdf = !!String(meta.save_pdf_field || '').trim();
+  if (mode === 'link') return hasLink ? 'Сохранение ссылки в сделку' : 'Сохранение ссылки отключено (поле не задано)';
+  if (mode === 'pdf') return hasPdf ? 'Сохранение PDF в сделку' : 'Сохранение PDF отключено (поле не задано)';
+  if (hasLink && hasPdf) return 'Сохранение ссылки и PDF в сделку';
+  if (hasLink && !hasPdf) return 'Сохранение ссылки в сделку (PDF отключен)';
+  if (!hasLink && hasPdf) return 'Сохранение PDF в сделку (ссылка отключена)';
+  return 'Сохранение в сделку отключено (поля не заданы)';
+}
+
+function applyTemplateModeUI(mode) {
+  const normalized = normalizeResultMode(mode);
+  const meta = getSelectedTemplateMeta();
+  const btnLabel = document.getElementById('generateBtnLabel');
+  const s4 = document.getElementById('s4');
+  const s5 = document.getElementById('s5');
+
+  if (btnLabel) btnLabel.textContent = modeButtonTitle(normalized);
+
+  if (s4) s4.innerHTML = `<div class="step-dot"></div> ${modeStep4Title(normalized)}`;
+  if (s5) s5.innerHTML = `<div class="step-dot"></div> ${modeStep5Title(normalized, meta)}`;
 }
 
 // ── Генерация ─────────────────────────────────────────────────────────────────
 async function generate() {
   const templateKey = document.getElementById('templateSelect').value;
   if (!templateKey) return;
+  const selectedMode = getSelectedTemplateMode();
 
   if (!ctx.dealId) {
     showError('Не удалось определить ID сделки. Откройте виджет из карточки сделки.');
     return;
   }
 
-  setUIGenerating();
+  applyTemplateModeUI(selectedMode);
+  setUIGenerating(selectedMode);
 
   // Анимация шагов (приблизительное время каждого)
   const stepDelays = [0, 1200, 2500, 3500, 5000];
@@ -370,12 +449,8 @@ async function generate() {
     // Отмечаем все шаги выполненными
     [1,2,3,4,5].forEach(i => setStep(i, 'done'));
 
-    showSuccess(
-      `✅ Документ <strong>${escHtml(data.doc_name)}</strong> создан.<br>` +
-      `<a href="${escHtml(data.doc_link)}" target="_blank">Открыть в Doczilla →</a>` +
-      `<div id="autoCloseHint" style="margin-top:8px"></div>` +
-      `${buildWarningsHtml(data)}`
-    );
+    const mode = normalizeResultMode(data.result_mode || selectedMode);
+    showSuccess(buildSuccessHtml(data, mode));
 
     scheduleAutoClose(3000);
 
@@ -390,10 +465,18 @@ async function generate() {
 }
 
 // ── UI helpers ────────────────────────────────────────────────────────────────
-function setUIGenerating() {
+function modeLoadingText(mode) {
+  if (mode === 'link') return 'Создаём документ и сохраняем ссылку…';
+  if (mode === 'pdf') return 'Генерируем PDF и сохраняем в сделку…';
+  return 'Генерируем документ и сохраняем ссылку + PDF…';
+}
+
+function setUIGenerating(mode = 'both') {
   document.getElementById('generateBtn').disabled = true;
   document.getElementById('templateSelect').disabled = true;
   document.getElementById('steps').classList.add('visible');
+  const loadingText = document.getElementById('statusLoadingText');
+  if (loadingText) loadingText.textContent = modeLoadingText(normalizeResultMode(mode));
   document.getElementById('statusLoading').className = 'status loading show';
   document.getElementById('statusSuccess').className = 'status success';
   document.getElementById('statusError').className = 'status error';
@@ -414,6 +497,8 @@ function showSuccess(html) {
   el.innerHTML = html;
   el.className = 'status success show';
   document.getElementById('statusError').className = 'status error';
+  document.getElementById('templateSelect').disabled = false;
+  updateGenerateButtonState();
 }
 
 function showError(msg) {
@@ -449,19 +534,46 @@ function renderDealPill() {
 
 async function loadDealInfo() {
   if (!ctx.dealId) return;
-  const res = await fetch(`${API_BASE}/api/deal-info`, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({
-      deal_id: ctx.dealId,
-      bitrix_token: ctx.token,
-      bitrix_domain: ctx.domain,
-    }),
-  });
-  if (!res.ok) return;
-  const data = await res.json();
-  if (data && data.id) ctx.dealId = String(data.id);
-  if (data && data.title) ctx.dealTitle = String(data.title);
+  try {
+    const res = await fetch(`${API_BASE}/api/deal-info`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        deal_id: ctx.dealId,
+        bitrix_token: ctx.token,
+        bitrix_domain: ctx.domain,
+      }),
+    });
+    if (res.ok) {
+      const data = await res.json();
+      if (data && data.id) ctx.dealId = String(data.id);
+      if (data && data.title) ctx.dealTitle = String(data.title);
+    }
+  } catch (_e) {}
+
+  if (!ctx.dealTitle) {
+    const bxTitle = await loadDealTitleViaBx24();
+    if (bxTitle) ctx.dealTitle = bxTitle;
+  }
+}
+
+async function loadDealTitleViaBx24() {
+  if (!ctx.dealId || !window.BX24 || typeof BX24.callMethod !== 'function') return '';
+  const payload = await withTimeout(new Promise(resolve => {
+    try {
+      BX24.callMethod('crm.deal.get', { id: ctx.dealId }, (res) => {
+        if (res && typeof res.error === 'function' && res.error()) {
+          return resolve(null);
+        }
+        const data = (res && typeof res.data === 'function') ? res.data() : null;
+        resolve(data || null);
+      });
+    } catch (_e) {
+      resolve(null);
+    }
+  }), 1400, null);
+  if (!payload || typeof payload !== 'object') return '';
+  return String(payload.TITLE || payload.title || '').trim();
 }
 
 function buildWarningsHtml(data) {
@@ -470,6 +582,31 @@ function buildWarningsHtml(data) {
     .map(w => `<li>${escHtml(String(w))}</li>`)
     .join('');
   return `<div style="margin-top:8px;color:#fbbf24"><ul style="margin:0;padding-left:16px">${items}</ul></div>`;
+}
+
+function modeSuccessText(mode) {
+  if (mode === 'link') return 'Ссылка сохранена в сделку.';
+  if (mode === 'pdf') return 'PDF сохранён в сделку.';
+  return 'Ссылка и PDF сохранены в сделку.';
+}
+
+function buildSuccessHtml(data, mode) {
+  const hasWarnings = !!(data && Array.isArray(data.warnings) && data.warnings.length);
+  const resultText = hasWarnings
+    ? 'Документ создан. Проверьте предупреждения ниже.'
+    : modeSuccessText(mode);
+  const dealActions = [
+    `<button type="button" class="inline-btn" onclick="goToDeal()">Вернуться к сделке</button>`,
+    `<button type="button" class="inline-btn" onclick="closeWidgetNow()">Закрыть окно</button>`,
+  ].join('');
+  return (
+    `✅ Документ <strong>${escHtml(data.doc_name)}</strong> создан.<br>` +
+    `<a href="${escHtml(data.doc_link)}" target="_blank" rel="noopener">Открыть в Doczilla →</a><br>` +
+    `<span style="opacity:.9">${escHtml(resultText)}</span>` +
+    `<div id="autoCloseHint" style="margin-top:8px"></div>` +
+    `<div class="inline-actions">${dealActions}</div>` +
+    `${buildWarningsHtml(data)}`
+  );
 }
 
 function callBxClose(bx) {
@@ -498,12 +635,17 @@ function closeWidgetNow() {
     () => (window.parent && window.parent !== window) ? callBxClose(window.parent.BX24) : false,
     () => (window.top && window.top !== window) ? callBxClose(window.top.BX24) : false,
   ];
+  let called = false;
   for (const tryClose of attempts) {
     try {
-      if (tryClose()) return;
+      if (tryClose()) called = true;
     } catch (_e) {}
   }
-  try { window.close(); } catch (_e) {}
+  try {
+    window.close();
+    called = true;
+  } catch (_e) {}
+  return called;
 }
 
 function renderAutoCloseHint(msLeft) {
@@ -515,11 +657,16 @@ function renderAutoCloseHint(msLeft) {
     `<button type="button" onclick="cancelAutoClose(true)">Оставить открытым</button>`;
 }
 
+function renderAutoCloseFailedHint() {
+  const holder = document.getElementById('autoCloseHint');
+  if (!holder) return;
+  holder.innerHTML =
+    `Не удалось закрыть окно автоматически.` +
+    `<button type="button" onclick="goToDeal()">Вернуться к сделке</button>` +
+    `<button type="button" onclick="closeWidgetNow()">Повторить закрытие</button>`;
+}
+
 function cancelAutoClose(showNotice = false) {
-  if (autoCloseTimer) {
-    clearTimeout(autoCloseTimer);
-    autoCloseTimer = null;
-  }
   if (autoCloseTicker) {
     clearInterval(autoCloseTicker);
     autoCloseTicker = null;
@@ -540,13 +687,53 @@ function scheduleAutoClose(delayMs = 3000) {
     renderAutoCloseHint(left);
     if (left <= 0) {
       cancelAutoClose();
-      closeWidgetNow();
+      const requested = closeWidgetNow();
+      if (!requested) {
+        renderAutoCloseFailedHint();
+        return;
+      }
+      setTimeout(() => {
+        renderAutoCloseFailedHint();
+      }, 900);
     }
   }, 250);
-  autoCloseTimer = setTimeout(() => {
-    cancelAutoClose();
-    closeWidgetNow();
-  }, delayMs + 80);
+}
+
+function buildDealUrl() {
+  if (!ctx.domain || !ctx.dealId) return '';
+  const id = encodeURIComponent(String(ctx.dealId));
+  return `https://${ctx.domain}/crm/deal/details/${id}/`;
+}
+
+function goToDeal() {
+  const dealUrl = buildDealUrl();
+  if (!dealUrl) return;
+
+  try {
+    if (window.BX24 && typeof BX24.openPath === 'function') {
+      BX24.openPath(`/crm/deal/details/${ctx.dealId}/`);
+      closeWidgetNow();
+      return;
+    }
+  } catch (_e) {}
+
+  try {
+    if (window.top && window.top !== window) {
+      window.top.location.href = dealUrl;
+      return;
+    }
+  } catch (_e) {}
+  try {
+    if (window.parent && window.parent !== window) {
+      window.parent.location.href = dealUrl;
+      return;
+    }
+  } catch (_e) {}
+  try {
+    window.location.href = dealUrl;
+  } catch (_e) {
+    try { window.open(dealUrl, '_blank', 'noopener'); } catch (_err) {}
+  }
 }
 
 async function initContext() {
@@ -566,6 +753,11 @@ async function initContext() {
     params.get('domain'),
     params.get('auth[domain]'),
   ));
+  if (!ctx.domain && document.referrer) {
+    try {
+      ctx.domain = normalizeDomain(new URL(document.referrer).host);
+    } catch (_e) {}
+  }
   ctx.token = firstNonEmpty(
     params.get('AUTH_ID'),
     params.get('auth[access_token]'),
