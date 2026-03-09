@@ -1,10 +1,9 @@
 """
 Эндпоинты для виджета Битрикс24:
-    GET/POST /bitrix/widget  — HTML виджета (iframe в карточке сделки)
+    GET/POST /bitrix/widget     — HTML виджета (iframe в карточке сделки)
     GET      /api/widget-config — список активных шаблонов для <select>
-    GET/POST /install        — OAuth-установка: обмен code→токены + placement.bind
+    GET/POST /install           — установка: сохраняем токены + регистрируем кнопку
 """
-from datetime import datetime
 from pathlib import Path
 import logging
 
@@ -25,11 +24,13 @@ settings = get_settings()
 @router.get("/bitrix/widget", response_class=FileResponse, include_in_schema=False)
 @router.post("/bitrix/widget", response_class=FileResponse, include_in_schema=False)
 async def serve_widget(request: Request):
+    """Б24 открывает эту страницу в iframe при нажатии кнопки."""
     return FileResponse(STATIC_DIR / "widget.html", media_type="text/html")
 
 
 @router.get("/api/widget-config")
 async def widget_config():
+    """Список активных шаблонов для выпадающего списка в виджете."""
     with SessionLocal() as db:
         templates = repo.list_templates(db)
     active = [{"key": t.key, "name": t.name} for t in templates if t.active]
@@ -42,63 +43,59 @@ async def install_get(request: Request):
     return FileResponse(STATIC_DIR / "install.html", media_type="text/html")
 
 
-@router.post("/install", response_class=HTMLResponse, include_in_schema=False)
+@router.post("/install", response_class=FileResponse, include_in_schema=False)
 async def install_post(request: Request):
     """
-    POST /install — Б24 шлёт сюда code при установке.
-    Обмениваем code на access_token + refresh_token, сохраняем в БД,
-    регистрируем placement CRM_DEAL_TOOLBAR.
+    POST /install — Б24 шлёт сюда токены при установке локального приложения.
+
+    Тело запроса содержит:
+        AUTH_ID      — access token
+        REFRESH_ID   — refresh token
+        AUTH_EXPIRES — время жизни токена в секундах
+        member_id    — ID портала
+        DOMAIN       — домен портала (в query string)
     """
     params = dict(request.query_params)
     form   = dict(await request.form())
+
     logger.info("install POST query_params: %s", params)
-    logger.info("install POST form body: %s", form)
-    code   = params.get("code") or form.get("code")
-    domain = params.get("DOMAIN") or params.get("domain") or form.get("DOMAIN") or form.get("domain")
+    logger.info("install POST form body: %s", {
+        k: v for k, v in form.items() if "ID" not in k  # не логируем токены
+    })
 
-    logger.info("install POST: domain=%s code=%s", domain, bool(code))
+    domain     = params.get("DOMAIN") or params.get("domain") or form.get("DOMAIN") or form.get("domain")
+    auth_id    = form.get("AUTH_ID")
+    refresh_id = form.get("REFRESH_ID")
+    expires    = int(form.get("AUTH_EXPIRES", 3600))
+    member_id  = form.get("member_id")
 
-    if code and domain and settings.BITRIX_CLIENT_ID and settings.BITRIX_CLIENT_SECRET:
+    logger.info("install POST: domain=%s auth=%s", domain, bool(auth_id))
+
+    if auth_id and domain:
         try:
+            # ── Сохраняем токены в БД ─────────────────────────────────────────
+            with SessionLocal() as db:
+                repo.save_oauth_token(db, domain, auth_id, refresh_id, expires, member_id)
+            logger.info("✅ Токены сохранены для %s", domain)
+
+            # ── Регистрируем кнопку в CRM ─────────────────────────────────────
+            widget_url = f"{settings.APP_PUBLIC_URL}/bitrix/widget"
             async with httpx.AsyncClient(timeout=15) as client:
-                # ── Обмен code → токены ───────────────────────────────────────
-                r = await client.get("https://oauth.bitrix.info/oauth/token/", params={
-                    "grant_type":    "authorization_code",
-                    "client_id":     settings.BITRIX_CLIENT_ID,
-                    "client_secret": settings.BITRIX_CLIENT_SECRET,
-                    "code":          code,
-                })
-                token_data = r.json()
-                logger.info("token response: %s", token_data)
-
-                if "access_token" in token_data:
-                    access_token  = token_data["access_token"]
-                    refresh_token = token_data["refresh_token"]
-                    expires_in    = int(token_data.get("expires_in", 3600))
-                    member_id     = token_data.get("member_id")
-
-                    # Сохраняем токены в БД
-                    with SessionLocal() as db:
-                        repo.save_oauth_token(db, domain, access_token,
-                                              refresh_token, expires_in, member_id)
-                    logger.info("✅ Токены сохранены для %s", domain)
-
-                    # ── Регистрируем кнопку в CRM ─────────────────────────────
-                    widget_url = f"{settings.APP_PUBLIC_URL}/bitrix/widget"
-                    r2 = await client.post(
-                        f"https://{domain}/rest/placement.bind.json",
-                        params={"auth": access_token},
-                        json={
-                            "PLACEMENT": "CRM_DEAL_TOOLBAR",
-                            "HANDLER":   widget_url,
-                            "TITLE":     "📄 Создать документ",
-                        }
-                    )
-                    logger.info("placement.bind: %s", r2.json())
-                else:
-                    logger.error("Ошибка получения токена: %s", token_data)
+                r = await client.post(
+                    f"https://{domain}/rest/placement.bind.json",
+                    params={"auth": auth_id},
+                    json={
+                        "PLACEMENT": "CRM_DEAL_TOOLBAR",
+                        "HANDLER":   widget_url,
+                        "TITLE":     "📄 Создать документ",
+                    }
+                )
+                result = r.json()
+                logger.info("placement.bind: %s", result)
 
         except Exception as e:
             logger.error("Ошибка при установке: %s", e)
+    else:
+        logger.warning("install POST: нет AUTH_ID или domain — пропускаем")
 
     return FileResponse(STATIC_DIR / "install.html", media_type="text/html")
