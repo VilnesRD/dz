@@ -362,8 +362,10 @@ textarea{resize:vertical;min-height:56px}
                 <div class="row"><code>deal.TITLE</code><span style="color:var(--muted)">поле сделки</span></div>
                 <div class="row"><code>contact.NAME</code><span style="color:var(--muted)">поле контакта</span></div>
                 <div class="row"><code>company.TITLE</code><span style="color:var(--muted)">поле компании</span></div>
+                <div class="row"><code>doc.103</code><span style="color:var(--muted)">значение другой переменной Doczilla (по её id)</span></div>
                 <div class="row"><code>{deal.NAME} {contact.LAST_NAME}</code><span style="color:var(--muted)">формула</span></div>
                 <div class="row"><code style="color:var(--success)">Москва</code><span style="color:var(--muted)">фиксированное значение</span></div>
+                <div class="row"><code>{"source_field":"deal.UF_CRM_LIST","options":{"Опция A":["201","202"]},"on_not_empty":"203","this_condition_id":"201"}</code><span style="color:var(--muted)">selector_map (мультивыбор и проверки empty/not_empty)</span></div>
                 <div style="margin-top:10px;padding-top:8px;border-top:1px solid var(--border)">
                   <span style="cursor:pointer;color:var(--accent)" @click="showB24=true;showHint=false">📋 Справочник полей Б24 →</span>
                 </div>
@@ -563,6 +565,12 @@ textarea{resize:vertical;min-height:56px}
     <div class="field"><label>Шаблон имени файла</label>
       <input type="text" x-model="tForm.doc_name_template" placeholder="Договор {deal_id} от {date}">
       <div class="hint">{deal_id}, {company}, {date}</div></div>
+    <div class="field"><label>Поле сделки для ссылки</label>
+      <input type="text" x-model="tForm.bitrix_deal_link_field" placeholder="UF_CRM_DOCZILLA_LINK">
+      <div class="hint">Код пользовательского поля сделки (тип строка/ссылка)</div></div>
+    <div class="field"><label>Поле сделки для PDF (опц.)</label>
+      <input type="text" x-model="tForm.bitrix_deal_pdf_field" placeholder="UF_CRM_DOCZILLA_PDF">
+      <div class="hint">Если указано, PDF будет загружаться в это FILE-поле сделки</div></div>
     <div style="display:flex;gap:8px;justify-content:flex-end;margin-top:8px">
       <button class="btn btn-ghost" @click="showTmplModal=false">Отмена</button>
       <button class="btn btn-primary" @click="saveT()" :disabled="tLoading">
@@ -695,10 +703,18 @@ function app() { return {
   openNew(){
     this.tForm={key:'',name:'',doczilla_file_id:'',doczilla_link:'',
       doczilla_folder_id:'00000000-0000-0000-0000-000000000000',
-      doc_name_template:'Документ {deal_id} от {date}',active:true};
+      doc_name_template:'Документ {deal_id} от {date}',
+      bitrix_deal_link_field:'UF_CRM_DOCZILLA_LINK',
+      bitrix_deal_pdf_field:'',
+      active:true};
     this.tErr=''; this.showTmplModal=true;
   },
-  editT(t){this.tForm={...t};this.tErr='';this.showTmplModal=true;},
+  editT(t){
+    this.tForm={...t};
+    if(!('bitrix_deal_link_field' in this.tForm)) this.tForm.bitrix_deal_link_field='UF_CRM_DOCZILLA_LINK';
+    if(!('bitrix_deal_pdf_field' in this.tForm)) this.tForm.bitrix_deal_pdf_field='';
+    this.tErr=''; this.showTmplModal=true;
+  },
   async saveT(){
     this.tLoading=true; this.tErr='';
     try{

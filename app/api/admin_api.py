@@ -106,6 +106,8 @@ class TemplateIn(BaseModel):
     doczilla_link: str
     doczilla_folder_id: str = "00000000-0000-0000-0000-000000000000"
     doc_name_template: str = "Документ {deal_id}"
+    bitrix_deal_link_field: str = settings.BITRIX_DEAL_LINK_FIELD
+    bitrix_deal_pdf_field: str = ""
     active: bool = True
 
 
@@ -268,6 +270,8 @@ async def import_doczilla_templates(
                 doczilla_link=link,
                 doczilla_folder_id=folder_id,
                 doc_name_template="Документ {deal_id} от {date}",
+                bitrix_deal_link_field=settings.BITRIX_DEAL_LINK_FIELD,
+                bitrix_deal_pdf_field="",
                 active=body.active,
             )
             if created_tpl and body.sync_structure:
@@ -571,6 +575,8 @@ def _template_to_dict(t) -> dict:
         "doczilla_link": t.doczilla_link,
         "doczilla_folder_id": t.doczilla_folder_id,
         "doc_name_template": t.doc_name_template,
+        "bitrix_deal_link_field": t.bitrix_deal_link_field or "",
+        "bitrix_deal_pdf_field": t.bitrix_deal_pdf_field or "",
         "active": t.active,
         "has_structure": bool(t.structure_json),
         "structure_updated_at": t.structure_updated_at.isoformat() if t.structure_updated_at else None,

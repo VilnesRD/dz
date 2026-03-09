@@ -2,6 +2,7 @@
 
 Генерация документов в Doczilla PRO по данным из CRM Битрикс24.
 Кнопка в карточке сделки → iframe с выбором шаблона → PDF → ссылка в сделке.
+Поля для сохранения результата (ссылка/PDF) настраиваются отдельно для каждого шаблона в `/admin`.
 
 ## Структура
 
@@ -86,6 +87,7 @@ docker compose up -d --build
 | `DOCZILLA_PASSWORD` | Пароль |
 | `DOCZILLA_TEMPLATES_SECTION_ID` | Section ID опубликованных dotx-шаблонов (импорт в `/admin` сканирует корень и 1 уровень вложенных папок) |
 | `APP_PUBLIC_URL` | `https://bridge.vird.cloud` |
+| `BITRIX_DEAL_LINK_FIELD` | Fallback-поле сделки для ссылки (если в шаблоне не задано своё поле) |
 | `BITRIX_CLIENT_ID` | Client ID локального приложения (для refresh_token) |
 | `BITRIX_CLIENT_SECRET` | Client Secret локального приложения (для refresh_token) |
 | `ADMIN_USERNAME` | Логин в панель |

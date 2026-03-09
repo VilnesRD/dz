@@ -255,6 +255,7 @@ const params = new URLSearchParams(window.location.search);
 const API_BASE = window.location.origin;
 const ctx = {
   dealId: '',
+  dealTitle: '',
   domain: '',
   token: '',
 };
@@ -265,6 +266,11 @@ document.addEventListener('DOMContentLoaded', async () => {
     await initContext();
   } catch (e) {
     console.warn('initContext failed:', e);
+  }
+  try {
+    await loadDealInfo();
+  } catch (e) {
+    console.warn('loadDealInfo failed:', e);
   }
   renderDealPill();
   await loadTemplates();
@@ -347,7 +353,9 @@ async function generate() {
 
     showSuccess(
       `✅ Документ <strong>${escHtml(data.doc_name)}</strong> создан.<br>` +
-      `<a href="${escHtml(data.doc_link)}" target="_blank">Открыть в Doczilla →</a>`
+      `<a href="${escHtml(data.doc_link)}" target="_blank">Открыть в Doczilla →</a>` +
+      `${buildPreviewLink(data)}` +
+      `${buildWarningsHtml(data)}`
     );
 
     // Закрываем iframe через 3 сек (Б24 BX24.closeApplication)
@@ -409,7 +417,44 @@ function updateGenerateButtonState() {
 }
 
 function renderDealPill() {
-  document.getElementById('dealPill').innerHTML = `<span></span> Сделка #${ctx.dealId || '—'}`;
+  const title = (ctx.dealTitle || '').trim();
+  if (title) {
+    document.getElementById('dealPill').innerHTML =
+      `<span></span> ${escHtml(title)} <small style="opacity:.65">#${escHtml(ctx.dealId || '—')}</small>`;
+    return;
+  }
+  document.getElementById('dealPill').innerHTML = `<span></span> Сделка #${escHtml(ctx.dealId || '—')}`;
+}
+
+async function loadDealInfo() {
+  if (!ctx.dealId) return;
+  const res = await fetch(`${API_BASE}/api/deal-info`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({
+      deal_id: ctx.dealId,
+      bitrix_token: ctx.token,
+      bitrix_domain: ctx.domain,
+    }),
+  });
+  if (!res.ok) return;
+  const data = await res.json();
+  if (data && data.id) ctx.dealId = String(data.id);
+  if (data && data.title) ctx.dealTitle = String(data.title);
+}
+
+function buildPreviewLink(data) {
+  const url = data && data.pdf_preview_url ? String(data.pdf_preview_url) : '';
+  if (!url) return '';
+  return `<br><a href="${escHtml(url)}" target="_blank">Предпросмотр PDF →</a>`;
+}
+
+function buildWarningsHtml(data) {
+  if (!data || !Array.isArray(data.warnings) || data.warnings.length === 0) return '';
+  const items = data.warnings
+    .map(w => `<li>${escHtml(String(w))}</li>`)
+    .join('');
+  return `<div style="margin-top:8px;color:#fbbf24"><ul style="margin:0;padding-left:16px">${items}</ul></div>`;
 }
 
 async function initContext() {

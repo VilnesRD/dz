@@ -5,6 +5,7 @@
   OAuth локального приложения (AUTH_ID / REFRESH_ID / DOMAIN).
 """
 import logging
+import base64
 from datetime import datetime
 from typing import Any
 
@@ -171,6 +172,30 @@ class BitrixClient:
     async def set_deal_doczilla_link(self, deal_id: int | str, link: str) -> bool:
         """Записать ссылку на документ Doczilla в поле сделки."""
         return await self.update_deal(deal_id, {settings.BITRIX_DEAL_LINK_FIELD: link})
+
+    async def set_deal_field(self, deal_id: int | str, field_code: str, value: Any) -> bool:
+        """Записать значение в произвольное поле сделки."""
+        code = str(field_code or "").strip()
+        if not code:
+            raise BitrixError("Не указан код поля сделки")
+        return await self.update_deal(deal_id, {code: value})
+
+    async def set_deal_file_field(
+        self,
+        deal_id: int | str,
+        field_code: str,
+        filename: str,
+        content: bytes,
+    ) -> bool:
+        """
+        Загрузить файл в пользовательское FILE-поле сделки через crm.deal.update.
+        """
+        code = str(field_code or "").strip()
+        if not code:
+            raise BitrixError("Не указан код FILE-поля сделки")
+        b64 = base64.b64encode(content).decode()
+        value = {"fileData": [filename, b64]}
+        return await self.update_deal(deal_id, {code: value})
 
     # ── CRM: Контакты ─────────────────────────────────────────────────────────
 

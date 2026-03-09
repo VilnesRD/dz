@@ -7,15 +7,18 @@ FastAPI — точка входа.
     GET  /install             — страница установки Б24-приложения
     GET  /bitrix/widget       — виджет для iframe в карточке сделки
     GET  /api/widget-config   — список шаблонов для виджета
+    POST /api/deal-info       — краткая информация о сделке (ID/название)
     POST /api/generate        — запуск генерации из iframe Б24
+    GET  /api/doc-preview/{doc_id} — прокси-предпросмотр PDF из Doczilla
     /admin/*                  — REST API админ-панели
 """
 import logging
 from contextlib import asynccontextmanager
 from pathlib import Path
+import re
 
 from fastapi import FastAPI, HTTPException
-from fastapi.responses import FileResponse, HTMLResponse
+from fastapi.responses import FileResponse, HTMLResponse, Response
 from pydantic import BaseModel
 
 from app.core.config import get_settings
@@ -125,6 +128,47 @@ class GenerateRequest(BaseModel):
     bitrix_token: str | None = None
 
 
+class DealInfoRequest(BaseModel):
+    deal_id: str
+    bitrix_domain: str | None = None
+    bitrix_token: str | None = None
+
+
+def _safe_filename(value: str, fallback: str) -> str:
+    text = re.sub(r"[\\/:*?\"<>|]+", "_", (value or "").strip())
+    text = re.sub(r"\s+", " ", text).strip()
+    return text or fallback
+
+
+@app.post("/api/deal-info")
+async def deal_info(req: DealInfoRequest):
+    """Получить ID и название сделки для UI виджета."""
+    client: BitrixClient | None = None
+    try:
+        if req.bitrix_domain:
+            domain = req.bitrix_domain
+        else:
+            from app.db.database import SessionLocal
+            from app.db import repository as repo
+            with SessionLocal() as db:
+                token = repo.get_latest_oauth_token(db)
+            domain = token.domain if token else None
+
+        if not domain:
+            raise HTTPException(400, "Не указан domain портала Б24")
+
+        client = BitrixClient(domain=domain, access_token=req.bitrix_token)
+        deal = await client.get_deal(req.deal_id)
+        deal_id = str(deal.get("ID") or req.deal_id)
+        title = str(deal.get("TITLE") or f"Сделка #{deal_id}")
+        return {"id": deal_id, "title": title}
+    except BitrixError as e:
+        raise HTTPException(502, str(e))
+    finally:
+        if client:
+            await client.close()
+
+
 @app.post("/api/generate")
 async def manual_generate(req: GenerateRequest):
     """Генерация документа для сделки через OAuth local app."""
@@ -138,6 +182,8 @@ async def manual_generate(req: GenerateRequest):
             "doc_id": result.doc_id,
             "doc_link": result.doc_link,
             "doc_name": result.doc_name,
+            "pdf_preview_url": f"/api/doc-preview/{result.doc_id}",
+            "warnings": result.warnings,
         }
     except KeyError as e:
         raise HTTPException(404, str(e))
@@ -148,3 +194,20 @@ async def manual_generate(req: GenerateRequest):
     finally:
         if owns_bitrix_client and svc:
             await svc.bitrix.close()
+
+
+@app.get("/api/doc-preview/{doc_id}")
+async def doc_preview(doc_id: str, name: str | None = None):
+    """Отдать PDF документа из Doczilla для inline-просмотра в браузере."""
+    if _doczilla_client is None:
+        raise HTTPException(503, "DoczillaClient не инициализирован")
+    try:
+        pdf = await _doczilla_client.get_document_pdf(doc_id)
+        filename = _safe_filename(name or f"{doc_id}.pdf", f"{doc_id}.pdf")
+        return Response(
+            content=pdf,
+            media_type="application/pdf",
+            headers={"Content-Disposition": f'inline; filename="{filename}"'},
+        )
+    except DoczillaError as e:
+        raise HTTPException(502, str(e))

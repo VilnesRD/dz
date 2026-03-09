@@ -41,3 +41,22 @@ def init_db():
     """Создать все таблицы если не существуют. Вызывается при старте."""
     from app.db import models  # noqa: F401 — регистрирует модели
     Base.metadata.create_all(bind=engine)
+    _migrate_templates_columns()
+
+
+def _migrate_templates_columns():
+    """
+    Лёгкие миграции SQLite без Alembic:
+    добавляем новые колонки в templates, если их ещё нет.
+    """
+    required = {
+        "bitrix_deal_link_field": "ALTER TABLE templates ADD COLUMN bitrix_deal_link_field VARCHAR(128) NOT NULL DEFAULT ''",
+        "bitrix_deal_pdf_field": "ALTER TABLE templates ADD COLUMN bitrix_deal_pdf_field VARCHAR(128) NOT NULL DEFAULT ''",
+    }
+    with engine.begin() as conn:
+        rows = conn.exec_driver_sql("PRAGMA table_info(templates)").fetchall()
+        existing = {str(row[1]) for row in rows if len(row) > 1}
+        for column, ddl in required.items():
+            if column in existing:
+                continue
+            conn.exec_driver_sql(ddl)

@@ -15,6 +15,7 @@
 """
 import logging
 from dataclasses import dataclass
+import re
 
 from app.services.bitrix_client import BitrixClient
 from app.services.doczilla_client import DoczillaClient
@@ -33,6 +34,7 @@ class GenerationResult:
     doc_link: str
     doc_name: str
     template_id: int
+    warnings: list[str]
 
 
 class DocumentGenerationService:
@@ -82,6 +84,7 @@ class DocumentGenerationService:
         # ── 3. Маппинг полей ──────────────────────────────────────────────────
         payload = build_fill_payload(template, deal, contact, company)
         doc_name = build_doc_name(template, deal)
+        warnings: list[str] = []
         non_empty = sum(
             1 for v in payload.values()
             if v not in (None, "", [], {}, ())
@@ -118,14 +121,33 @@ class DocumentGenerationService:
         else:
             doc_link = f"{base}/workspace#file/{doc_id}"
 
-        # ── 6. Записать в Б24 ─────────────────────────────────────────────────
-        logger.info("deal=%s: записываем ссылку в Б24", deal_id)
-        await self.bitrix.update_deal(deal_id, {
-            settings.BITRIX_DEAL_LINK_FIELD: doc_link
-        })
+        # ── 6. Записать результат в Б24 ───────────────────────────────────────
+        link_field = str(getattr(template, "bitrix_deal_link_field", "") or settings.BITRIX_DEAL_LINK_FIELD or "").strip()
+        if link_field:
+            try:
+                logger.info("deal=%s: записываем ссылку в Б24 поле %s", deal_id, link_field)
+                await self.bitrix.set_deal_field(deal_id, link_field, doc_link)
+            except Exception as e:
+                warn = f"Не удалось сохранить ссылку в поле {link_field}: {e}"
+                warnings.append(warn)
+                logger.warning("deal=%s: %s", deal_id, warn)
+
+        pdf_field = str(getattr(template, "bitrix_deal_pdf_field", "") or "").strip()
+        if pdf_field:
+            try:
+                logger.info("deal=%s: получаем PDF и загружаем в поле %s", deal_id, pdf_field)
+                pdf_bytes = await self.doczilla.get_document_pdf(doc_id)
+                filename = _make_pdf_filename(doc_name)
+                await self.bitrix.set_deal_file_field(deal_id, pdf_field, filename, pdf_bytes)
+            except Exception as e:
+                warn = f"Не удалось сохранить PDF в поле {pdf_field}: {e}"
+                warnings.append(warn)
+                logger.warning("deal=%s: %s", deal_id, warn)
 
         # ── 7. Комментарий в ленту ────────────────────────────────────────────
         comment = f"✅ Документ сгенерирован: {doc_name}\n🔗 {doc_link}"
+        if warnings:
+            comment += "\n⚠️ " + "\n⚠️ ".join(warnings)
         try:
             await self.bitrix.add_deal_comment(deal_id, comment)
         except Exception as e:
@@ -137,4 +159,16 @@ class DocumentGenerationService:
             doc_link=doc_link,
             doc_name=doc_name,
             template_id=template.id,
+            warnings=warnings,
         )
+
+
+def _make_pdf_filename(doc_name: str) -> str:
+    name = (doc_name or "document").strip()
+    name = re.sub(r"[\\/:*?\"<>|]+", "_", name)
+    name = re.sub(r"\s+", " ", name).strip()
+    if not name:
+        name = "document"
+    if not name.lower().endswith(".pdf"):
+        name += ".pdf"
+    return name
