@@ -113,6 +113,9 @@ class DoczillaImportBody(BaseModel):
     section_id: str | None = None
     doczilla_folder_id: str | None = None
     active: bool = True
+    # Если True — сразу делаем structureRead для всех импортируемых шаблонов.
+    # По умолчанию выключено, чтобы не ловить таймауты reverse-proxy.
+    sync_structure: bool = False
 
 
 @router.get("/templates")
@@ -202,7 +205,12 @@ async def import_doczilla_templates(
     if not section:
         raise HTTPException(400, "Не указан section_id (body.section_id или DOCZILLA_TEMPLATES_SECTION_ID)")
     _validate_doczilla_section_id(section)
-    log.info("doczilla import: section_id=%s folder_override=%s", section, body.doczilla_folder_id)
+    log.info(
+        "doczilla import: section_id=%s folder_override=%s sync_structure=%s",
+        section,
+        body.doczilla_folder_id,
+        body.sync_structure,
+    )
 
     created = 0
     updated = 0
@@ -237,7 +245,7 @@ async def import_doczilla_templates(
                     doczilla_folder_id=folder_id,
                     active=body.active,
                 )
-                if updated_tpl:
+                if updated_tpl and body.sync_structure:
                     try:
                         await _sync_template_structure_and_mappings(
                             db, client, updated_tpl.id, updated_tpl.doczilla_file_id
@@ -262,7 +270,7 @@ async def import_doczilla_templates(
                 doc_name_template="Документ {deal_id} от {date}",
                 active=body.active,
             )
-            if created_tpl:
+            if created_tpl and body.sync_structure:
                 try:
                     await _sync_template_structure_and_mappings(
                         db, client, created_tpl.id, created_tpl.doczilla_file_id
@@ -286,6 +294,7 @@ async def import_doczilla_templates(
         "structure_synced": structure_synced,
         "structure_failed": structure_failed,
         "structure_errors": structure_errors,
+        "structure_sync_enabled": body.sync_structure,
     }
 
 

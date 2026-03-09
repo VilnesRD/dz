@@ -105,6 +105,18 @@ class DoczillaClient:
             return value.strip().lower() in ("1", "true", "yes", "y")
         return False
 
+    @staticmethod
+    def _is_dotx(item: dict) -> bool:
+        """
+        Определить, что элемент является шаблоном формата dotx.
+        """
+        item_type = str(item.get("type") or "").strip().lower()
+        if item_type:
+            return item_type == "dotx"
+        # fallback на имя, если type не пришёл в ответе
+        name = str(item.get("name") or "").strip().lower()
+        return name.endswith(".dotx")
+
     async def _read_workspace(
         self,
         section_id: str,
@@ -148,12 +160,16 @@ class DoczillaClient:
 
         templates: list[dict] = []
         folders: list[dict] = []
+        skipped_non_dotx = 0
 
         for item in root_items:
             if not isinstance(item, dict):
                 continue
             if self._is_folder(item):
                 folders.append(item)
+                continue
+            if not self._is_dotx(item):
+                skipped_non_dotx += 1
                 continue
             record_id = str(item.get("recordId") or "").strip()
             link = str(item.get("link") or "").strip()
@@ -190,6 +206,9 @@ class DoczillaClient:
                     continue
                 if self._is_folder(item):
                     continue
+                if not self._is_dotx(item):
+                    skipped_non_dotx += 1
+                    continue
                 record_id = str(item.get("recordId") or "").strip()
                 link = str(item.get("link") or "").strip()
                 name = str(item.get("name") or "").strip()
@@ -212,10 +231,11 @@ class DoczillaClient:
                 uniq[rid] = item
         result = list(uniq.values())
         logger.info(
-            "Doczilla templates scan: section=%s root_items=%d folders=%d total=%d",
+            "Doczilla templates scan: section=%s root_items=%d folders=%d skipped_non_dotx=%d total=%d",
             section_id,
             len(root_items),
             len([f for f in folders if isinstance(f, dict)]),
+            skipped_non_dotx,
             len(result),
         )
         return result

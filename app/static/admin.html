@@ -676,10 +676,14 @@ function app() { return {
     try{
       const r=await this.req('POST','/admin/templates/import-doczilla',{
         section_id: this.doczSection,
-        active:true
+        active:true,
+        sync_structure:false
       });
+      const structInfo=r.structure_sync_enabled
+        ?`структура ${r.structure_synced} ок / ${r.structure_failed} ошибок`
+        :'структура: отложена (инициализация при первом открытии маппинга)';
       this.setImpMsg(
-        `Импорт завершён (section ${r.section_id}): создано ${r.created}, обновлено ${r.updated}, пропущено ${r.skipped}, структура ${r.structure_synced} ок / ${r.structure_failed} ошибок`,
+        `Импорт завершён (section ${r.section_id}): создано ${r.created}, обновлено ${r.updated}, пропущено ${r.skipped}, ${structInfo}`,
         'success',
         5000
       );
@@ -903,8 +907,19 @@ function app() { return {
     if(body!==undefined){o.headers['Content-Type']='application/json';o.body=JSON.stringify(body);}
     const r=await fetch(API+path,o);
     if(r.status===204)return null;
-    const d=await r.json();
-    if(!r.ok)throw new Error(d.detail||JSON.stringify(d));
+    const raw=await r.text();
+    let d=null;
+    if(raw){
+      try{d=JSON.parse(raw);}
+      catch{
+        const text=raw.replace(/<[^>]*>/g,' ').replace(/\s+/g,' ').trim();
+        d={detail:text||raw};
+      }
+    }
+    if(!r.ok){
+      const msg=(d&& (d.detail||d.error_description||d.error)) || `${r.status} ${r.statusText}`;
+      throw new Error(String(msg).slice(0,500));
+    }
     return d;
   },
 };}
