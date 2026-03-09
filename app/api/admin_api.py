@@ -204,12 +204,6 @@ async def import_doczilla_templates(
     _validate_doczilla_section_id(section)
     log.info("doczilla import: section_id=%s folder_override=%s", section, body.doczilla_folder_id)
 
-    client = DoczillaClient()
-    try:
-        items = await client.get_templates(section)
-    finally:
-        await client.close()
-
     created = 0
     updated = 0
     skipped = 0
@@ -217,65 +211,71 @@ async def import_doczilla_templates(
     structure_failed = 0
     structure_errors: list[str] = []
 
-    for item in items:
-        record_id = str(item.get("recordId") or "").strip()
-        link = str(item.get("link") or "").strip()
-        name = str(item.get("name") or "").strip()
-        if not (record_id and link and name):
-            skipped += 1
-            continue
+    client = DoczillaClient()
+    try:
+        items = await client.get_templates(section)
 
-        existing = db.query(Template).filter(Template.doczilla_file_id == record_id).first()
-        folder_id = (
-            body.doczilla_folder_id
-            or str(item.get("folderId") or "")
-            or "00000000-0000-0000-0000-000000000000"
-        )
-        if existing:
-            updated_tpl = repo.update_template(
-                db, existing.id,
+        for item in items:
+            record_id = str(item.get("recordId") or "").strip()
+            link = str(item.get("link") or "").strip()
+            name = str(item.get("name") or "").strip()
+            if not (record_id and link and name):
+                skipped += 1
+                continue
+
+            existing = db.query(Template).filter(Template.doczilla_file_id == record_id).first()
+            folder_id = (
+                body.doczilla_folder_id
+                or str(item.get("folderId") or "")
+                or "00000000-0000-0000-0000-000000000000"
+            )
+            if existing:
+                updated_tpl = repo.update_template(
+                    db, existing.id,
+                    name=name,
+                    doczilla_link=link,
+                    doczilla_folder_id=folder_id,
+                    active=body.active,
+                )
+                if updated_tpl:
+                    try:
+                        await _sync_template_structure_and_mappings(
+                            db, client, updated_tpl.id, updated_tpl.doczilla_file_id
+                        )
+                        structure_synced += 1
+                    except Exception as e:
+                        structure_failed += 1
+                        log.warning("structure sync failed template_id=%s file_id=%s: %s", updated_tpl.id, record_id, e)
+                        if len(structure_errors) < 5:
+                            structure_errors.append(f"{name}: {e}")
+                updated += 1
+                continue
+
+            key = _unique_key(db, _slugify(name))
+            created_tpl = repo.create_template(
+                db,
+                key=key,
                 name=name,
+                doczilla_file_id=record_id,
                 doczilla_link=link,
                 doczilla_folder_id=folder_id,
+                doc_name_template="Документ {deal_id} от {date}",
                 active=body.active,
             )
-            if updated_tpl:
+            if created_tpl:
                 try:
                     await _sync_template_structure_and_mappings(
-                        db, client, updated_tpl.id, updated_tpl.doczilla_file_id
+                        db, client, created_tpl.id, created_tpl.doczilla_file_id
                     )
                     structure_synced += 1
                 except Exception as e:
                     structure_failed += 1
-                    log.warning("structure sync failed template_id=%s file_id=%s: %s", updated_tpl.id, record_id, e)
+                    log.warning("structure sync failed template_id=%s file_id=%s: %s", created_tpl.id, record_id, e)
                     if len(structure_errors) < 5:
                         structure_errors.append(f"{name}: {e}")
-            updated += 1
-            continue
-
-        key = _unique_key(db, _slugify(name))
-        created_tpl = repo.create_template(
-            db,
-            key=key,
-            name=name,
-            doczilla_file_id=record_id,
-            doczilla_link=link,
-            doczilla_folder_id=folder_id,
-            doc_name_template="Документ {deal_id} от {date}",
-            active=body.active,
-        )
-        if created_tpl:
-            try:
-                await _sync_template_structure_and_mappings(
-                    db, client, created_tpl.id, created_tpl.doczilla_file_id
-                )
-                structure_synced += 1
-            except Exception as e:
-                structure_failed += 1
-                log.warning("structure sync failed template_id=%s file_id=%s: %s", created_tpl.id, record_id, e)
-                if len(structure_errors) < 5:
-                    structure_errors.append(f"{name}: {e}")
-        created += 1
+            created += 1
+    finally:
+        await client.close()
 
     return {
         "section_id": section,
@@ -361,8 +361,20 @@ class MappingItem(BaseModel):
 @router.get("/templates/{tid}/mappings")
 async def get_mappings(tid: int, db: Session = Depends(get_db),
                        _=Depends(current_user)):
-    _get_or_404(db, tid)
+    from app.services.doczilla_client import DoczillaClient
+
+    t = _get_or_404(db, tid)
     mappings = repo.get_mappings(db, tid)
+    if not mappings or not t.structure_json:
+        client = DoczillaClient()
+        try:
+            await _sync_template_structure_and_mappings(db, client, t.id, t.doczilla_file_id)
+            mappings = repo.get_mappings(db, tid)
+            log.info("mappings auto-initialized: template_id=%s count=%s", tid, len(mappings))
+        except Exception as e:
+            raise HTTPException(502, f"Не удалось инициализировать маппинг из структуры Doczilla: {e}")
+        finally:
+            await client.close()
     return [_mapping_to_dict(m) for m in mappings]
 
 

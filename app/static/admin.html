@@ -835,7 +835,17 @@ function app() { return {
     if(brace) q=brace[1];
     this.acRes=q
       ?this.b24Fields.filter(f=>f.path.toLowerCase().includes(q)||f.label.toLowerCase().includes(q)).slice(0,12)
-      :this.b24Fields.slice(0,10);
+      :this.defaultAcResults();
+  },
+  defaultAcResults(){
+    const byPrefix=(p)=>this.b24Fields.filter(f=>f.path.startsWith(p));
+    const deal=byPrefix('deal.').slice(0,4);
+    const contact=byPrefix('contact.').slice(0,4);
+    const company=byPrefix('company.').slice(0,4);
+    const used=new Set([...deal,...contact,...company].map(f=>f.path));
+    const other=this.b24Fields.filter(f=>!used.has(f.path)).slice(0,4);
+    const mixed=[...deal,...contact,...company,...other];
+    return mixed.length?mixed:this.b24Fields.slice(0,12);
   },
   acDown(){this.acIdx=Math.min(this.acIdx+1,this.acRes.length-1);},
   acUp(){this.acIdx=Math.max(this.acIdx-1,-1);},
