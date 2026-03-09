@@ -15,6 +15,7 @@
     6. signout()                 — закрыть сессию (вызывается при shutdown)
 """
 import logging
+import re
 from typing import Any
 
 import httpx
@@ -258,7 +259,7 @@ class DoczillaClient:
         template_link: str,
         name: str,
         folder_id: str = "",
-    ) -> str:
+    ) -> dict[str, str]:
         """
         Создать анкету (docz) из шаблона. Метод 3.2.1.
         Возвращает recordId созданной анкеты.
@@ -272,12 +273,19 @@ class DoczillaClient:
             "folder": folder_id,
             "name": name,
         })
-        # API возвращает recordId созданного документа
-        record = data.get("data", {})
-        doc_id = record.get("recordId") or record.get("id")
+        # API может вернуть data как dict или list (в зависимости от версии backend).
+        record = _extract_doc_record(data.get("data"))
+        if not record:
+            record = _extract_doc_record(data.get("info", {}).get("files"))
+        if not record:
+            record = _extract_doc_record(data)
+
+        doc_id = str(record.get("recordId") or record.get("id") or "").strip()
+        link = str(record.get("link") or "").strip()
         if not doc_id:
-            raise DoczillaError([{"text": f"createDocz: не получен recordId. data={record}"}])
-        return doc_id
+            raise DoczillaError([{"text": f"createDocz: не получен recordId. data={data.get('data')}"}])
+        logger.info("Doczilla createDocz: created id=%s link=%s name=%s", doc_id, link or "-", name)
+        return {"id": doc_id, "recordId": doc_id, "link": link}
 
     async def fill_docz(self, doc_id: str, variables: dict[str, Any]) -> None:
         """
@@ -290,7 +298,9 @@ class DoczillaClient:
             "action": "content",
             "method": "fillDocz",
             "data": json.dumps(variables, ensure_ascii=False),
+            # В разных версиях API встречаются оба варианта параметра.
             "id": doc_id,
+            "file": doc_id,
         })
         logger.debug("Doczilla fillDocz: заполнено %d переменных для %s", len(variables), doc_id)
 
@@ -372,3 +382,59 @@ class DoczillaClient:
             "file": file_id,
         })
         return data.get("data", {})
+
+
+def _looks_like_doc_id(value: str) -> bool:
+    text = value.strip()
+    if not text or text.startswith("{") or text.startswith("["):
+        return False
+    # UUID / длинный token / числовой id
+    if re.fullmatch(r"[0-9]+", text):
+        return True
+    if re.fullmatch(r"[0-9A-Za-z_-]{16,}", text):
+        return True
+    return False
+
+
+def _extract_doc_record(value: Any) -> dict[str, str]:
+    """
+    Унифицировать извлечение recordId/link документа из разнородных ответов createDocz.
+    """
+    if isinstance(value, dict):
+        doc_id = ""
+        for key in ("recordId", "id", "fileId", "docId", "file"):
+            raw = value.get(key)
+            if isinstance(raw, (str, int, float)):
+                candidate = str(raw).strip()
+                if _looks_like_doc_id(candidate):
+                    doc_id = candidate
+                    break
+        if doc_id:
+            link = value.get("link")
+            return {
+                "id": doc_id,
+                "recordId": doc_id,
+                "link": str(link).strip() if isinstance(link, (str, int, float)) else "",
+            }
+        for key in ("data", "result", "record", "document", "doc", "item", "items", "files"):
+            if key not in value:
+                continue
+            candidate = _extract_doc_record(value.get(key))
+            if candidate:
+                return candidate
+        return {}
+
+    if isinstance(value, list):
+        for item in value:
+            candidate = _extract_doc_record(item)
+            if candidate:
+                return candidate
+        return {}
+
+    if isinstance(value, (str, int, float)):
+        candidate = str(value).strip()
+        if _looks_like_doc_id(candidate):
+            return {"id": candidate, "recordId": candidate, "link": ""}
+        return {}
+
+    return {}

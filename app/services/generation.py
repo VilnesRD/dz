@@ -82,7 +82,11 @@ class DocumentGenerationService:
         # ── 3. Маппинг полей ──────────────────────────────────────────────────
         payload = build_fill_payload(template, deal, contact, company)
         doc_name = build_doc_name(template, deal)
-        logger.info("deal=%s: payload %d переменных", deal_id, len(payload))
+        non_empty = sum(
+            1 for v in payload.values()
+            if v not in (None, "", [], {}, ())
+        )
+        logger.info("deal=%s: payload %d переменных (непустых=%d)", deal_id, len(payload), non_empty)
 
         # ── 4. Создать и заполнить документ в Doczilla ────────────────────────
         logger.info("deal=%s: создаём документ в Doczilla", deal_id)
@@ -92,21 +96,27 @@ class DocumentGenerationService:
             name=doc_name,
             folder_id=template.doczilla_folder_id,
         )
-        # create_docz в текущем клиенте возвращает recordId (str),
-        # но держим фолбэк на старый dict-формат.
+        doc_link_code = ""
         if isinstance(doc, dict):
             doc_id = str(doc.get("id") or doc.get("recordId") or "").strip()
+            doc_link_code = str(doc.get("link") or "").strip()
         else:
             doc_id = str(doc).strip()
         if not doc_id:
             raise RuntimeError("Doczilla createDocz не вернул ID документа")
-        logger.info("deal=%s: doc_id=%s, заполняем переменные", deal_id, doc_id)
+        logger.info("deal=%s: doc_id=%s link_code=%s, заполняем переменные", deal_id, doc_id, doc_link_code or "-")
 
         await self.doczilla.fill_docz(doc_id, payload)
 
         # ── 5. Ссылка на документ ─────────────────────────────────────────────
         base = settings.DOCZILLA_BASE_URL.rstrip("/")
-        doc_link = f"{base}/workspace#file/{doc_id}"
+        if doc_link_code:
+            if doc_link_code.startswith("http://") or doc_link_code.startswith("https://"):
+                doc_link = doc_link_code
+            else:
+                doc_link = f"{base}/#{doc_link_code}"
+        else:
+            doc_link = f"{base}/workspace#file/{doc_id}"
 
         # ── 6. Записать в Б24 ─────────────────────────────────────────────────
         logger.info("deal=%s: записываем ссылку в Б24", deal_id)
