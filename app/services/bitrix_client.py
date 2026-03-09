@@ -111,7 +111,13 @@ class BitrixClient:
 
     # ── Внутренний helper ─────────────────────────────────────────────────────
 
-    async def _call(self, method: str, params: dict[str, Any] | None = None) -> Any:
+    async def _call(
+        self,
+        method: str,
+        params: dict[str, Any] | None = None,
+        *,
+        raw: bool = False,
+    ) -> Any:
         """
         Вызвать метод Битрикс24 REST API через OAuth локального приложения.
         """
@@ -132,11 +138,18 @@ class BitrixClient:
         if "error" in data:
             raise BitrixError(f"{data['error']}: {data.get('error_description', '')}")
 
+        if raw:
+            return data
         return data.get("result")
 
     async def call(self, method: str, params: dict[str, Any] | None = None) -> Any:
         """Публичный вызов произвольного метода REST API Битрикс24."""
         return await self._call(method, params)
+
+    async def call_raw(self, method: str, params: dict[str, Any] | None = None) -> dict[str, Any]:
+        """Публичный вызов, возвращающий полный ответ (result/next/total/time)."""
+        data = await self._call(method, params, raw=True)
+        return data if isinstance(data, dict) else {"result": data}
 
     # ── CRM: Сделки ───────────────────────────────────────────────────────────
 

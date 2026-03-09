@@ -846,10 +846,10 @@ function app() { return {
     const isCustomQuery=q.includes('uf_')||q.includes('ufcrm')||q.includes('кастом')||q.includes('пользователь');
     if(isCustomQuery){
       const customOnly=ranked.filter(f=>f.path.toLowerCase().includes('.uf_'));
-      this.acRes=(customOnly.length?customOnly:ranked).slice(0,80);
+      this.acRes=(customOnly.length?customOnly:ranked);
       return;
     }
-    this.acRes=ranked.slice(0,80);
+    this.acRes=ranked;
   },
   rankFieldResults(q){
     const starts=[], contains=[];
@@ -862,21 +862,13 @@ function app() { return {
   },
   defaultAcResults(){
     const byPrefix=(p)=>this.b24Fields.filter(f=>f.path.toLowerCase().startsWith(p));
-    const split=(arr)=>{
-      const custom=arr.filter(f=>f.path.toLowerCase().includes('.uf_'));
-      const base=arr.filter(f=>!f.path.toLowerCase().includes('.uf_'));
-      return {custom,base};
-    };
-    const d=split(byPrefix('deal.'));
-    const c=split(byPrefix('contact.'));
-    const co=split(byPrefix('company.'));
-    const deal=[...d.custom.slice(0,3),...d.base.slice(0,5)];
-    const contact=[...c.custom.slice(0,2),...c.base.slice(0,4)];
-    const company=[...co.custom.slice(0,2),...co.base.slice(0,4)];
+    const deal=byPrefix('deal.');
+    const contact=byPrefix('contact.');
+    const company=byPrefix('company.');
     const used=new Set([...deal,...contact,...company].map(f=>f.path));
-    const other=this.b24Fields.filter(f=>!used.has(f.path)).slice(0,4);
-    const mixed=[...deal,...contact,...company,...other];
-    return mixed.length?mixed:this.b24Fields.slice(0,20);
+    const other=this.b24Fields.filter(f=>!used.has(f.path));
+    const full=[...deal,...contact,...company,...other];
+    return full.length?full:this.b24Fields;
   },
   acDown(){this.acIdx=Math.min(this.acIdx+1,this.acRes.length-1);},
   acUp(){this.acIdx=Math.max(this.acIdx-1,-1);},

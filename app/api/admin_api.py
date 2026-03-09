@@ -443,52 +443,94 @@ async def get_bitrix_fields(
     client = BitrixClient(domain=domain, access_token=auth_id)
     stats = {"deal": 0, "contact": 0, "company": 0}
     custom_stats = {"deal": 0, "contact": 0, "company": 0}
+    uf_label_stats = {"deal": 0, "contact": 0, "company": 0}
     errors: list[str] = []
     try:
-        # Поля сделки
+        # Названия кастомных UF_* полей берём из userfield.list
+        deal_uf_labels: dict[str, str] = {}
+        contact_uf_labels: dict[str, str] = {}
+        company_uf_labels: dict[str, str] = {}
         try:
-            deal_fields = _extract_bitrix_fields(await client.call("crm.deal.fields"))
-            for fname, finfo in deal_fields.items():
-                fields.append({
-                    "path": f"deal.{fname}",
-                    "label": f"Сделка: {finfo.get('title', fname)}",
-                    "type": finfo.get("type", ""),
-                })
-            stats["deal"] = len(deal_fields)
-            custom_stats["deal"] = len([k for k in deal_fields.keys() if str(k).upper().startswith("UF_")])
+            deal_uf_rows = await _call_bitrix_list_all(client, "crm.deal.userfield.list")
+            deal_uf_labels = _build_userfield_label_map(deal_uf_rows)
+            uf_label_stats["deal"] = len(deal_uf_labels)
         except Exception as e:
-            log.warning("crm.deal.fields: %s", e)
-            errors.append(f"deal: {e}")
+            log.warning("crm.deal.userfield.list: %s", e)
+            errors.append(f"deal.userfield: {e}")
+        try:
+            contact_uf_rows = await _call_bitrix_list_all(client, "crm.contact.userfield.list")
+            contact_uf_labels = _build_userfield_label_map(contact_uf_rows)
+            uf_label_stats["contact"] = len(contact_uf_labels)
+        except Exception as e:
+            log.warning("crm.contact.userfield.list: %s", e)
+            errors.append(f"contact.userfield: {e}")
+        try:
+            company_uf_rows = await _call_bitrix_list_all(client, "crm.company.userfield.list")
+            company_uf_labels = _build_userfield_label_map(company_uf_rows)
+            uf_label_stats["company"] = len(company_uf_labels)
+        except Exception as e:
+            log.warning("crm.company.userfield.list: %s", e)
+            errors.append(f"company.userfield: {e}")
+
+        # Поля сделки
+        deal_fields = await _load_crm_entity_fields(
+            client=client,
+            legacy_method="crm.deal.fields",
+            item_entity_type_id=2,
+            log_key="deal",
+            errors=errors,
+        )
+        for fname, finfo in deal_fields.items():
+            title = str(finfo.get("title", fname))
+            if str(fname).upper().startswith("UF_"):
+                title = deal_uf_labels.get(str(fname), title)
+            fields.append({
+                "path": f"deal.{fname}",
+                "label": f"Сделка: {title}",
+                "type": finfo.get("type", ""),
+            })
+        stats["deal"] = len(deal_fields)
+        custom_stats["deal"] = len([k for k in deal_fields.keys() if str(k).upper().startswith("UF_")])
 
         # Поля контакта
-        try:
-            contact_fields = _extract_bitrix_fields(await client.call("crm.contact.fields"))
-            for fname, finfo in contact_fields.items():
-                fields.append({
-                    "path": f"contact.{fname}",
-                    "label": f"Контакт: {finfo.get('title', fname)}",
-                    "type": finfo.get("type", ""),
-                })
-            stats["contact"] = len(contact_fields)
-            custom_stats["contact"] = len([k for k in contact_fields.keys() if str(k).upper().startswith("UF_")])
-        except Exception as e:
-            log.warning("crm.contact.fields: %s", e)
-            errors.append(f"contact: {e}")
+        contact_fields = await _load_crm_entity_fields(
+            client=client,
+            legacy_method="crm.contact.fields",
+            item_entity_type_id=3,
+            log_key="contact",
+            errors=errors,
+        )
+        for fname, finfo in contact_fields.items():
+            title = str(finfo.get("title", fname))
+            if str(fname).upper().startswith("UF_"):
+                title = contact_uf_labels.get(str(fname), title)
+            fields.append({
+                "path": f"contact.{fname}",
+                "label": f"Контакт: {title}",
+                "type": finfo.get("type", ""),
+            })
+        stats["contact"] = len(contact_fields)
+        custom_stats["contact"] = len([k for k in contact_fields.keys() if str(k).upper().startswith("UF_")])
 
         # Поля компании
-        try:
-            company_fields = _extract_bitrix_fields(await client.call("crm.company.fields"))
-            for fname, finfo in company_fields.items():
-                fields.append({
-                    "path": f"company.{fname}",
-                    "label": f"Компания: {finfo.get('title', fname)}",
-                    "type": finfo.get("type", ""),
-                })
-            stats["company"] = len(company_fields)
-            custom_stats["company"] = len([k for k in company_fields.keys() if str(k).upper().startswith("UF_")])
-        except Exception as e:
-            log.warning("crm.company.fields: %s", e)
-            errors.append(f"company: {e}")
+        company_fields = await _load_crm_entity_fields(
+            client=client,
+            legacy_method="crm.company.fields",
+            item_entity_type_id=4,
+            log_key="company",
+            errors=errors,
+        )
+        for fname, finfo in company_fields.items():
+            title = str(finfo.get("title", fname))
+            if str(fname).upper().startswith("UF_"):
+                title = company_uf_labels.get(str(fname), title)
+            fields.append({
+                "path": f"company.{fname}",
+                "label": f"Компания: {title}",
+                "type": finfo.get("type", ""),
+            })
+        stats["company"] = len(company_fields)
+        custom_stats["company"] = len([k for k in company_fields.keys() if str(k).upper().startswith("UF_")])
     except BitrixError as e:
         raise HTTPException(status.HTTP_502_BAD_GATEWAY, str(e))
     finally:
@@ -496,11 +538,20 @@ async def get_bitrix_fields(
 
     fields.sort(key=lambda x: x.get("path", ""))
     log.info(
-        "bitrix fields loaded: deal=%d contact=%d company=%d total=%d | custom: deal=%d contact=%d company=%d",
+        "bitrix fields loaded: deal=%d contact=%d company=%d total=%d | custom: deal=%d contact=%d company=%d | uf labels: deal=%d contact=%d company=%d",
         stats["deal"], stats["contact"], stats["company"], len(fields),
         custom_stats["deal"], custom_stats["contact"], custom_stats["company"],
+        uf_label_stats["deal"], uf_label_stats["contact"], uf_label_stats["company"],
     )
-    return {"fields": fields, "meta": {"stats": stats, "custom_stats": custom_stats, "errors": errors}}
+    return {
+        "fields": fields,
+        "meta": {
+            "stats": stats,
+            "custom_stats": custom_stats,
+            "uf_label_stats": uf_label_stats,
+            "errors": errors,
+        },
+    }
 
 
 # ── Helpers ───────────────────────────────────────────────────────────────────
@@ -637,6 +688,157 @@ def _extract_bitrix_fields(payload: Any) -> dict[str, dict]:
                 out[str(code)] = meta
         return out
     return {}
+
+
+def _extract_localized_label(value: Any) -> str:
+    if isinstance(value, str):
+        return value.strip()
+    if isinstance(value, dict):
+        for key in ("ru", "ru_RU", "en", "en_US"):
+            val = value.get(key)
+            if isinstance(val, str) and val.strip():
+                return val.strip()
+        for val in value.values():
+            if isinstance(val, str) and val.strip():
+                return val.strip()
+    return ""
+
+
+async def _call_bitrix_list_all(client, method: str, params: dict | None = None) -> list[dict]:
+    """
+    Собрать все страницы list-метода Б24 (result + next).
+    """
+    rows: list[dict] = []
+    start = 0
+    base = dict(params or {})
+
+    while True:
+        payload = dict(base)
+        payload["start"] = start
+        response = await client.call_raw(method, payload)
+        result = response.get("result")
+        chunk: list[Any]
+        if isinstance(result, list):
+            chunk = result
+        elif isinstance(result, dict):
+            items = result.get("items")
+            chunk = items if isinstance(items, list) else []
+        else:
+            chunk = []
+        rows.extend(item for item in chunk if isinstance(item, dict))
+
+        next_value = response.get("next")
+        if next_value is None:
+            break
+        try:
+            start = int(next_value)
+        except (TypeError, ValueError):
+            break
+
+    return rows
+
+
+async def _load_crm_entity_fields(
+    *,
+    client,
+    legacy_method: str,
+    item_entity_type_id: int,
+    log_key: str,
+    errors: list[str],
+) -> dict[str, dict]:
+    """
+    Загрузить поля CRM-сущности и объединить 2 источника:
+    1) legacy *crm.*.fields (коды совпадают с crm.*.get, например TITLE/UF_*)
+    2) crm.item.fields(entityTypeId=...) (более полный справочник полей)
+    """
+    legacy_fields: dict[str, dict] = {}
+    item_fields_raw: dict[str, dict] = {}
+    item_fields_legacy: dict[str, dict] = {}
+
+    try:
+        legacy_fields = _extract_bitrix_fields(await client.call(legacy_method))
+    except Exception as e:
+        log.warning("%s: %s", legacy_method, e)
+        errors.append(f"{log_key}.legacy_fields: {e}")
+
+    try:
+        item_payload = await client.call("crm.item.fields", {"entityTypeId": item_entity_type_id})
+        item_fields_raw = _extract_bitrix_fields(item_payload)
+    except Exception as e:
+        log.warning("crm.item.fields(%s): %s", item_entity_type_id, e)
+        errors.append(f"{log_key}.item_fields: {e}")
+
+    for code, meta in item_fields_raw.items():
+        legacy_code = _to_legacy_field_code(code)
+        if not legacy_code:
+            continue
+        if not isinstance(meta, dict):
+            meta = {}
+        existing = item_fields_legacy.get(legacy_code)
+        # Предпочитаем запись, где есть заголовок
+        if not existing or (not existing.get("title") and meta.get("title")):
+            item_fields_legacy[legacy_code] = dict(meta)
+
+    merged = {str(k): dict(v) for k, v in legacy_fields.items() if isinstance(v, dict)}
+    for code, meta in item_fields_legacy.items():
+        if code not in merged:
+            merged[code] = dict(meta)
+            continue
+        # Обогащаем legacy метаданные (title/type), не ломая обратную совместимость по ключам
+        if not merged[code].get("title") and meta.get("title"):
+            merged[code]["title"] = meta.get("title")
+        if not merged[code].get("type") and meta.get("type"):
+            merged[code]["type"] = meta.get("type")
+
+    log.info(
+        "crm fields merged: %s legacy=%d item=%d merged=%d",
+        log_key, len(legacy_fields), len(item_fields_legacy), len(merged),
+    )
+    return merged
+
+
+def _to_legacy_field_code(code: Any) -> str:
+    """
+    Привести код поля из crm.item.fields (camelCase) к формату legacy (UPPER_SNAKE),
+    чтобы пути были совместимы с crm.deal.get / crm.contact.get / crm.company.get.
+    """
+    text = str(code or "").strip()
+    if not text:
+        return ""
+    if text.upper() == text:
+        return text
+
+    # camelCase -> snake_case
+    snake = re.sub(r"([a-z0-9])([A-Z])", r"\1_\2", text)
+    # letter/number boundaries: parentId2 -> parent_id_2
+    snake = re.sub(r"([A-Za-z])([0-9])", r"\1_\2", snake)
+    snake = re.sub(r"([0-9])([A-Za-z])", r"\1_\2", snake)
+    snake = snake.replace("-", "_")
+    snake = re.sub(r"_+", "_", snake).strip("_")
+    return snake.upper()
+
+
+def _build_userfield_label_map(payload: Any) -> dict[str, str]:
+    """
+    Преобразовать ответ crm.*.userfield.list в map FIELD_NAME -> человекочитаемое имя.
+    """
+    if not isinstance(payload, list):
+        return {}
+    out: dict[str, str] = {}
+    for row in payload:
+        if not isinstance(row, dict):
+            continue
+        code = str(row.get("FIELD_NAME") or "").strip()
+        if not code:
+            continue
+        label = (
+            _extract_localized_label(row.get("EDIT_FORM_LABEL"))
+            or _extract_localized_label(row.get("LIST_COLUMN_LABEL"))
+            or _extract_localized_label(row.get("LIST_FILTER_LABEL"))
+            or code
+        )
+        out[code] = label
+    return out
 
 
 def _is_mapping_configured(m) -> bool:
