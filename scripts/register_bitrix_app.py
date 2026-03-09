@@ -45,8 +45,20 @@ async def register():
     async with httpx.AsyncClient() as client:
         base = settings.BITRIX_WEBHOOK_URL.rstrip("/")
 
+        # ── 0. Сначала очистить старые привязки ───────────────────────────────
+        res_list = await client.post(f"{base}/placement.list.json")
+        current = res_list.json().get("result", [])
+        for p in current:
+            if p.get("placement") not in ("CRM_DEAL_TOOLBAR", "CRM_DEAL_DETAIL_TOOLBAR"):
+                continue
+            res_unbind = await client.post(f"{base}/placement.unbind.json", json={
+                "PLACEMENT": p.get("placement"),
+                "HANDLER": p.get("handler"),
+            })
+            print(f"Удалён старый placement {p.get('placement')} ({p.get('handler')}): {res_unbind.json()}")
+
         # ── 1. Регистрация placement (кнопка в тулбаре карточки сделки) ──────
-        for placement in ("CRM_DEAL_TOOLBAR", "CRM_DEAL_DETAIL_TOOLBAR"):
+        for placement in ("CRM_DEAL_DETAIL_TOOLBAR", "CRM_DEAL_TOOLBAR"):
             print(f"Регистрируем placement {placement}...")
             res = await client.post(f"{base}/placement.bind.json", json={
                 "PLACEMENT": placement,

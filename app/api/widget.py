@@ -92,7 +92,41 @@ async def _process_install_payload(params: dict, form: dict) -> None:
 
     widget_url = f"{settings.APP_PUBLIC_URL}/bitrix/widget"
     async with httpx.AsyncClient(timeout=15) as client:
-        for placement in ("CRM_DEAL_TOOLBAR", "CRM_DEAL_DETAIL_TOOLBAR"):
+        # Сначала удаляем старые привязки этого приложения, чтобы гарантированно
+        # обновить handler после переустановки/смены URL.
+        list_resp = await client.post(
+            f"https://{domain}/rest/placement.list.json",
+            params={"auth": auth_id},
+        )
+        try:
+            placements = list_resp.json().get("result", [])
+        except Exception:
+            placements = []
+
+        target_placements = {"CRM_DEAL_TOOLBAR", "CRM_DEAL_DETAIL_TOOLBAR"}
+        for item in placements:
+            placement_name = str(item.get("placement") or "")
+            handler = str(item.get("handler") or "")
+            if placement_name not in target_placements:
+                continue
+
+            unbind_resp = await client.post(
+                f"https://{domain}/rest/placement.unbind.json",
+                params={"auth": auth_id},
+                json={
+                    "PLACEMENT": placement_name,
+                    "HANDLER": handler,
+                },
+            )
+            try:
+                unbind_data = unbind_resp.json()
+            except Exception:
+                unbind_data = {"status_code": unbind_resp.status_code}
+            logger.info("placement.unbind %s (%s): %s", placement_name, handler, unbind_data)
+
+        # Главный placement для этого портала
+        bind_targets = ("CRM_DEAL_DETAIL_TOOLBAR", "CRM_DEAL_TOOLBAR")
+        for placement in bind_targets:
             r = await client.post(
                 f"https://{domain}/rest/placement.bind.json",
                 params={"auth": auth_id},
