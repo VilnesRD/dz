@@ -78,6 +78,12 @@ textarea{resize:vertical;min-height:56px}
 .alert{padding:11px 14px;border-radius:7px;font-size:13px;margin-bottom:12px}
 .alert-error{background:rgba(239,68,68,.1);border:1px solid rgba(239,68,68,.2);color:var(--danger)}
 .alert-success{background:rgba(34,197,94,.1);border:1px solid rgba(34,197,94,.2);color:var(--success)}
+.alert-row{display:flex;align-items:center;justify-content:space-between;gap:10px}
+.alert-close{
+  border:none;background:none;color:inherit;cursor:pointer;
+  font-size:16px;line-height:1;padding:0 2px;opacity:.8;flex-shrink:0;
+}
+.alert-close:hover{opacity:1}
 .spinner-sm{width:13px;height:13px;border:2px solid rgba(255,255,255,.25);border-top-color:#fff;border-radius:50%;animation:spin .6s linear infinite;display:inline-block;flex-shrink:0}
 @keyframes spin{to{transform:rotate(360deg)}}
 .modal-bg{position:fixed;inset:0;background:rgba(0,0,0,.75);display:flex;align-items:center;justify-content:center;z-index:200;backdrop-filter:blur(2px)}
@@ -249,11 +255,16 @@ textarea{resize:vertical;min-height:56px}
             <button class="btn btn-primary" @click="openNew()">+ Добавить</button>
           </div>
         </div>
-        <div x-show="impMsg" class="alert" :class="impMsgT==='error'?'alert-error':'alert-success'" x-text="impMsg"></div>
+        <div x-show="impMsg" class="alert" :class="impMsgT==='error'?'alert-error':'alert-success'">
+          <div class="alert-row">
+            <span x-text="impMsg"></span>
+            <button type="button" class="alert-close" @click="closeImpMsg()" title="Закрыть">×</button>
+          </div>
+        </div>
         <div x-show="tmpls.length===0" class="empty card">Нет шаблонов.</div>
         <div x-show="tmpls.length>0" class="card" style="padding:0;overflow:hidden">
           <table class="tbl">
-            <thead><tr><th>Название / Ключ</th><th>Doczilla</th><th>Маппинг</th><th>Структура</th><th>Статус</th><th></th></tr></thead>
+            <thead><tr><th>Название / Ключ</th><th>Doczilla</th><th>Маппинг</th><th>Статус</th><th></th></tr></thead>
             <tbody>
               <template x-for="t in tmpls" :key="t.id">
                 <tr>
@@ -265,11 +276,7 @@ textarea{resize:vertical;min-height:56px}
                     <div class="mono" x-text="t.doczilla_file_id.slice(0,16)+'…'"></div>
                     <div class="mono" style="color:var(--muted)" x-text="'link: '+t.doczilla_link"></div>
                   </td>
-                  <td><span :class="t.mappings_count>0?'badge badge-green':'badge badge-gray'" x-text="t.mappings_count+' полей'"></span></td>
-                  <td>
-                    <span x-show="!t.has_structure" class="badge badge-amber">Нет</span>
-                    <span x-show="t.has_structure" class="badge badge-green">Есть</span>
-                  </td>
+                  <td><span :class="t.mappings_count>0?'badge badge-green':'badge badge-gray'" x-text="`${t.mappings_count}/${t.mappings_total||0}`"></span></td>
                   <td><span :class="t.active?'badge badge-blue':'badge badge-gray'" x-text="t.active?'Активен':'Выкл'"></span></td>
                   <td><div class="flex">
                     <button class="btn btn-ghost btn-sm" @click="openMapper(t)">Маппинг</button>
@@ -610,6 +617,7 @@ function app() { return {
   // templates
   tmpls:[], showTmplModal:false, tForm:{}, tErr:'', tLoading:false,
   impLoading:false, impMsg:'', impMsgT:'success', doczSection:'039BC112-E801-4F82-BA21-484F72500736',
+  impMsgTimer:null,
 
   // mapper
   editTmpl:null, mappings:[],
@@ -652,19 +660,32 @@ function app() { return {
 
   // ── templates ─────────────────────────────────────────────────
   async loadTmpls(){this.tmpls=await this.req('GET','/admin/templates');},
+  closeImpMsg(){
+    if(this.impMsgTimer){clearTimeout(this.impMsgTimer);this.impMsgTimer=null;}
+    this.impMsg='';
+  },
+  setImpMsg(text,type='success',autoHideMs=0){
+    this.closeImpMsg();
+    this.impMsg=text; this.impMsgT=type;
+    if(autoHideMs>0){
+      this.impMsgTimer=setTimeout(()=>{this.impMsg='';this.impMsgTimer=null;},autoHideMs);
+    }
+  },
   async importFromDoczilla(){
-    this.impLoading=true; this.impMsg='';
+    this.impLoading=true; this.closeImpMsg();
     try{
       const r=await this.req('POST','/admin/templates/import-doczilla',{
         section_id: this.doczSection,
         active:true
       });
-      this.impMsg=`Импорт завершён (section ${r.section_id}): создано ${r.created}, обновлено ${r.updated}, пропущено ${r.skipped}`;
-      this.impMsgT='success';
+      this.setImpMsg(
+        `Импорт завершён (section ${r.section_id}): создано ${r.created}, обновлено ${r.updated}, пропущено ${r.skipped}, структура ${r.structure_synced} ок / ${r.structure_failed} ошибок`,
+        'success',
+        5000
+      );
       await this.loadTmpls();
     }catch(e){
-      this.impMsg='Ошибка импорта: '+e.message;
-      this.impMsgT='error';
+      this.setImpMsg('Ошибка импорта: '+e.message,'error',0);
     }finally{this.impLoading=false;}
   },
   openNew(){
@@ -695,7 +716,7 @@ function app() { return {
     const raw=await this.req('GET',`/admin/templates/${t.id}/mappings`);
     raw.forEach((m,i)=>m._n=i+1);
     this.mappings=raw;
-    if(!this.b24Fields.length) this.loadB24();
+    await this.loadB24();
   },
   closeMapper(){this.editTmpl=null;this.loadTmpls();},
 
@@ -838,7 +859,16 @@ function app() { return {
   // ── B24 fields ────────────────────────────────────────────────
   async loadB24(){
     this.b24Loading=true;
-    try{const r=await this.req('GET','/admin/bitrix/fields');this.b24Fields=r.fields;}
+    try{
+      const r=await this.req('GET','/admin/bitrix/fields');
+      this.b24Fields=Array.isArray(r.fields)?r.fields:[];
+      const stats=r?.meta?.stats||{};
+      const errs=Array.isArray(r?.meta?.errors)?r.meta.errors:[];
+      if(this.editTmpl&&errs.length){
+        this.mAlert=`Поля Б24 загружены частично (deal:${stats.deal||0}, contact:${stats.contact||0}, company:${stats.company||0}).`;
+        this.mAlertT='error';
+      }
+    }
     catch(e){console.warn(e);}
     finally{this.b24Loading=false;}
   },
