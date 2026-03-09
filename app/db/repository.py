@@ -140,3 +140,10 @@ def save_oauth_token(db: Session, domain: str, access_token: str,
 def get_oauth_token(db: Session, domain: str):
     from app.db.models import OAuthToken
     return db.query(OAuthToken).filter_by(domain=domain).first()
+
+
+def get_latest_oauth_token(db: Session):
+    from app.db.models import OAuthToken
+    return (db.query(OAuthToken)
+              .order_by(OAuthToken.updated_at.desc())
+              .first())

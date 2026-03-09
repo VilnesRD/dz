@@ -34,7 +34,7 @@ class Template(Base):
     __tablename__ = "templates"
 
     id            = Column(Integer, primary_key=True)
-    key           = Column(String(64), unique=True, nullable=False)  # slug для вебхука
+    key           = Column(String(64), unique=True, nullable=False)  # ключ шаблона для /api/generate
     name          = Column(String(256), nullable=False)
     doczilla_file_id = Column(String(128), nullable=False)           # recordId
     doczilla_link    = Column(String(64),  nullable=False)           # короткий link

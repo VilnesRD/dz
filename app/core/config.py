@@ -12,8 +12,7 @@ class Settings(BaseSettings):
     DOCZILLA_PASSWORD: str          # пароль (plain, клиент сам хэширует если нужно)
     DOCZILLA_SESSION_TTL: int = 1800  # секунд (30 минут)
 
-    # ── Битрикс24 ─────────────────────────────────────────────────────────────
-    BITRIX_WEBHOOK_URL: str         # https://crm-test.doczilla.pro/rest/1/xxxxx/
+    # ── Битрикс24 (локальное OAuth-приложение) ───────────────────────────────
     BITRIX_DEAL_LINK_FIELD: str = "UF_CRM_DOCZILLA_LINK"
 
     # ── Приложение ────────────────────────────────────────────────────────────
@@ -27,6 +26,7 @@ class Settings(BaseSettings):
     ADMIN_USERNAME: str = "admin"
     ADMIN_PASSWORD: str = "admin"
     ADMIN_SECRET_KEY: str = "change-me-in-production-min-32-chars!!"
+    # Нужны для refresh_token. Для коротких операций можно жить на AUTH_ID.
     BITRIX_CLIENT_ID: str = ""
     BITRIX_CLIENT_SECRET: str = ""
 

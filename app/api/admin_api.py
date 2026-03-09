@@ -25,7 +25,6 @@ import os
 from datetime import datetime, timedelta, timezone
 from typing import Annotated, Any
 
-import httpx
 from fastapi import APIRouter, Depends, HTTPException, status
 from fastapi.security import OAuth2PasswordBearer, OAuth2PasswordRequestForm
 from jose import JWTError, jwt
@@ -227,23 +226,38 @@ async def get_logs(limit: int = 100, db: Session = Depends(get_db),
 # ── Bitrix fields helper ──────────────────────────────────────────────────────
 
 @router.get("/bitrix/fields")
-async def get_bitrix_fields(_=Depends(current_user)):
+async def get_bitrix_fields(
+    domain: str | None = None,
+    auth_id: str | None = None,
+    _=Depends(current_user),
+):
     """
     Возвращает список доступных полей Б24 для подсказок в маппере.
     Используется как справочник в UI (autocomplete).
     """
-    from app.core.config import get_settings
-    settings = get_settings()
+    from app.services.bitrix_client import BitrixClient, BitrixError
+    from app.db.database import SessionLocal
+    from app.db import repository as repo
 
     fields: list[dict] = []
-    async with httpx.AsyncClient(timeout=15) as client:
-        base = settings.BITRIX_WEBHOOK_URL.rstrip("/")
 
+    if not domain:
+        with SessionLocal() as db:
+            token = repo.get_latest_oauth_token(db)
+        domain = token.domain if token else None
+
+    if not domain:
+        raise HTTPException(
+            status.HTTP_400_BAD_REQUEST,
+            "Не найден домен Битрикс24. Переустановите локальное приложение и повторите запрос.",
+        )
+
+    client = BitrixClient(domain=domain, access_token=auth_id)
+    try:
         # Поля сделки
         try:
-            r = await client.post(f"{base}/crm.deal.fields.json")
-            deal_fields = r.json().get("result", {})
-            for fname, finfo in deal_fields.items():
+            deal_fields = await client.call("crm.deal.fields")
+            for fname, finfo in (deal_fields or {}).items():
                 fields.append({
                     "path": f"deal.{fname}",
                     "label": f"Сделка: {finfo.get('title', fname)}",
@@ -254,8 +268,8 @@ async def get_bitrix_fields(_=Depends(current_user)):
 
         # Поля контакта
         try:
-            r = await client.post(f"{base}/crm.contact.fields.json")
-            for fname, finfo in r.json().get("result", {}).items():
+            contact_fields = await client.call("crm.contact.fields")
+            for fname, finfo in (contact_fields or {}).items():
                 fields.append({
                     "path": f"contact.{fname}",
                     "label": f"Контакт: {finfo.get('title', fname)}",
@@ -266,8 +280,8 @@ async def get_bitrix_fields(_=Depends(current_user)):
 
         # Поля компании
         try:
-            r = await client.post(f"{base}/crm.company.fields.json")
-            for fname, finfo in r.json().get("result", {}).items():
+            company_fields = await client.call("crm.company.fields")
+            for fname, finfo in (company_fields or {}).items():
                 fields.append({
                     "path": f"company.{fname}",
                     "label": f"Компания: {finfo.get('title', fname)}",
@@ -275,6 +289,10 @@ async def get_bitrix_fields(_=Depends(current_user)):
                 })
         except Exception as e:
             log.warning("crm.company.fields: %s", e)
+    except BitrixError as e:
+        raise HTTPException(status.HTTP_502_BAD_GATEWAY, str(e))
+    finally:
+        await client.close()
 
     return {"fields": fields}
 

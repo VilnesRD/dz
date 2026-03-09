@@ -103,7 +103,7 @@ async def _process_install_payload(params: dict, form: dict) -> None:
         except Exception:
             placements = []
 
-        target_placements = {"CRM_DEAL_TOOLBAR", "CRM_DEAL_DETAIL_TOOLBAR"}
+        target_placements = {"CRM_DEAL_DETAIL_TOOLBAR"}
         for item in placements:
             placement_name = str(item.get("placement") or "")
             handler = str(item.get("handler") or "")
@@ -124,24 +124,21 @@ async def _process_install_payload(params: dict, form: dict) -> None:
                 unbind_data = {"status_code": unbind_resp.status_code}
             logger.info("placement.unbind %s (%s): %s", placement_name, handler, unbind_data)
 
-        # Главный placement для этого портала
-        bind_targets = ("CRM_DEAL_DETAIL_TOOLBAR", "CRM_DEAL_TOOLBAR")
-        for placement in bind_targets:
-            r = await client.post(
-                f"https://{domain}/rest/placement.bind.json",
-                params={"auth": auth_id},
-                json={
-                    "PLACEMENT": placement,
-                    "HANDLER": widget_url,
-                    "TITLE": "📄 Создать документ",
-                    "DESCRIPTION": "Генерация PDF через Doczilla PRO",
-                }
-            )
-            try:
-                data = r.json()
-            except Exception:
-                data = {"status_code": r.status_code, "text": r.text[:500]}
-            logger.info("placement.bind %s: %s", placement, data)
+        r = await client.post(
+            f"https://{domain}/rest/placement.bind.json",
+            params={"auth": auth_id},
+            json={
+                "PLACEMENT": "CRM_DEAL_DETAIL_TOOLBAR",
+                "HANDLER": widget_url,
+                "TITLE": "📄 Создать документ",
+                "DESCRIPTION": "Генерация PDF через Doczilla PRO",
+            }
+        )
+        try:
+            data = r.json()
+        except Exception:
+            data = {"status_code": r.status_code, "text": r.text[:500]}
+        logger.info("placement.bind CRM_DEAL_DETAIL_TOOLBAR: %s", data)
 
 
 @router.get("/bitrix/widget", response_class=FileResponse, include_in_schema=False)

@@ -31,7 +31,7 @@ deploy/
   doczilla-bridge      # nginx server block для bridge.vird.cloud
 scripts/
   inspect_template.py       # Просмотр переменных шаблона Doczilla
-  register_bitrix_app.py    # Регистрация кнопки в Б24
+  register_bitrix_app.py    # Перерегистрация placement через OAuth local app
 docker-compose.yml
 Dockerfile
 .env.example
@@ -64,9 +64,10 @@ sudo certbot --nginx -d bridge.vird.cloud --email you@email.com --agree-tos
 | Поле | Значение |
 |------|----------|
 | URL для установки | `https://bridge.vird.cloud/install` |
-| URL обработчика | `https://bridge.vird.cloud/webhook/bitrix` |
+| URL обработчика | `https://bridge.vird.cloud/bitrix/widget` |
 
-После установки: `python scripts/register_bitrix_app.py`
+После установки `/install` автоматически сохраняет OAuth-токены и делает `placement.bind` в `CRM_DEAL_DETAIL_TOOLBAR`.
+Скрипт `python scripts/register_bitrix_app.py` нужен только для принудительной перепривязки placement.
 
 ## Обновление
 
@@ -83,8 +84,9 @@ docker compose up -d --build
 | `DOCZILLA_BASE_URL` | URL Doczilla |
 | `DOCZILLA_LOGIN` | Email |
 | `DOCZILLA_PASSWORD` | Пароль |
-| `BITRIX_WEBHOOK_URL` | Вебхук Б24 |
 | `APP_PUBLIC_URL` | `https://bridge.vird.cloud` |
+| `BITRIX_CLIENT_ID` | Client ID локального приложения (для refresh_token) |
+| `BITRIX_CLIENT_SECRET` | Client Secret локального приложения (для refresh_token) |
 | `ADMIN_USERNAME` | Логин в панель |
 | `ADMIN_PASSWORD` | Пароль в панель |
 | `ADMIN_SECRET_KEY` | JWT-секрет (≥32 символа) |

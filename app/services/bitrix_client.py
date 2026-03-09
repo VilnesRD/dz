@@ -1,9 +1,8 @@
 """
 Клиент Битрикс24 REST API.
 
-Поддерживает два режима авторизации:
-  1. OAuth (приоритет) — если передан domain и в БД есть токены
-  2. Входящий вебхук   — fallback через BITRIX_WEBHOOK_URL из конфига
+Режим авторизации:
+  OAuth локального приложения (AUTH_ID / REFRESH_ID / DOMAIN).
 """
 import logging
 from datetime import datetime
@@ -27,12 +26,12 @@ class BitrixClient:
     Создаётся один раз при старте FastAPI и внедряется через Depends.
     """
 
-    def __init__(self, domain: str = None):
+    def __init__(self, domain: str | None = None, access_token: str | None = None):
         self._client = httpx.AsyncClient(timeout=30.0)
         # domain = портал Б24 (например crm-test.doczilla.pro)
-        # если None — используем вебхук из конфига
         self._domain = self._normalize_domain(domain)
-        self._base = settings.BITRIX_WEBHOOK_URL.rstrip("/")
+        # AUTH_ID текущего пользователя из BX24.getAuth() (если передан)
+        self._provided_access_token = access_token
 
     async def close(self):
         await self._client.aclose()
@@ -50,21 +49,39 @@ class BitrixClient:
     # ── OAuth helpers ─────────────────────────────────────────────────────────
 
     async def _get_access_token(self) -> str | None:
-        """Получить актуальный OAuth-токен, обновив если истёк."""
+        """Получить OAuth-токен: из запроса или из БД с refresh при необходимости."""
+        if self._provided_access_token:
+            return self._provided_access_token
+
         if not self._domain:
-            return None
+            raise BitrixError("Не указан DOMAIN портала Битрикс24")
+
         from app.db.database import SessionLocal
         from app.db import repository as repo
         with SessionLocal() as db:
             token = repo.get_oauth_token(db, self._domain)
         if not token:
-            return None
+            raise BitrixError(
+                f"OAuth-токен для портала '{self._domain}' не найден. Переустановите локальное приложение."
+            )
+
         if token.expires_at < datetime.utcnow():
             token = await self._refresh_token(token)
-        return token.access_token if token else None
+        if not token:
+            raise BitrixError(
+                f"Не удалось обновить OAuth-токен для портала '{self._domain}'. Проверьте CLIENT_ID/CLIENT_SECRET."
+            )
+        return token.access_token
 
     async def _refresh_token(self, token):
         """Обновить истёкший токен через refresh_token."""
+        if not settings.BITRIX_CLIENT_ID or not settings.BITRIX_CLIENT_SECRET:
+            logger.warning("BITRIX_CLIENT_ID/BITRIX_CLIENT_SECRET не заданы, refresh невозможен")
+            return None
+        if not token.refresh_token:
+            logger.warning("refresh_token отсутствует для domain=%s", token.domain)
+            return None
+
         try:
             r = await self._client.get(
                 "https://oauth.bitrix.info/oauth/token/",
@@ -96,21 +113,18 @@ class BitrixClient:
 
     async def _call(self, method: str, params: dict[str, Any] | None = None) -> Any:
         """
-        Вызвать метод Битрикс24 REST API.
-        Если есть OAuth-токен — использует его, иначе вебхук.
+        Вызвать метод Битрикс24 REST API через OAuth локального приложения.
         """
-        access_token = await self._get_access_token()
+        if not self._domain:
+            raise BitrixError("Не указан DOMAIN портала для вызова REST API")
 
-        if access_token and self._domain:
-            url = f"https://{self._domain}/rest/{method}.json"
-            response = await self._client.post(
-                url,
-                params={"auth": access_token},
-                json=params or {}
-            )
-        else:
-            url = f"{self._base}/{method}.json"
-            response = await self._client.post(url, json=params or {})
+        access_token = await self._get_access_token()
+        url = f"https://{self._domain}/rest/{method}.json"
+        response = await self._client.post(
+            url,
+            params={"auth": access_token},
+            json=params or {}
+        )
 
         response.raise_for_status()
         data = response.json()
@@ -119,6 +133,10 @@ class BitrixClient:
             raise BitrixError(f"{data['error']}: {data.get('error_description', '')}")
 
         return data.get("result")
+
+    async def call(self, method: str, params: dict[str, Any] | None = None) -> Any:
+        """Публичный вызов произвольного метода REST API Битрикс24."""
+        return await self._call(method, params)
 
     # ── CRM: Сделки ───────────────────────────────────────────────────────────
 
