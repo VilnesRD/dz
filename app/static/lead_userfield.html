@@ -3,68 +3,156 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Doczilla Lead Field</title>
+  <title>Doczilla Userfield</title>
   <style>
-    :root{
-      --bg:#f7f8fc;--card:#fff;--border:#dfe3ef;--text:#2d3445;--muted:#6f7991;
-      --accent:#ff4d7e;--accent2:#ff6a96;--ok:#16a34a;--err:#dc2626;
-      --radius:10px;--font:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,Arial,sans-serif;
+    :root {
+      --bg: #f7f8fc;
+      --card: #fff;
+      --border: #dfe3ef;
+      --text: #2d3445;
+      --muted: #6f7991;
+      --accent: #ff4d7e;
+      --accent2: #ff6a96;
+      --ok: #16a34a;
+      --err: #dc2626;
+      --radius: 8px;
+      --font: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Arial, sans-serif;
     }
-    *{box-sizing:border-box}
-    html,body{margin:0;padding:0;background:var(--bg);color:var(--text);font-family:var(--font);font-size:14px}
-    .wrap{padding:10px}
-    .card{background:var(--card);border:1px solid var(--border);border-radius:var(--radius);padding:12px}
-    .head{display:flex;align-items:center;gap:8px;margin-bottom:10px}
-    .logo{width:18px;height:18px;border-radius:4px;background:linear-gradient(135deg,#ff4d7e,#8f67ff)}
-    .ttl{font-size:14px;font-weight:700}
-    .sub{font-size:12px;color:var(--muted);margin-top:1px}
-    .line{font-size:12px;color:var(--muted);margin-bottom:8px}
-    select,button{
-      width:100%;border:1px solid var(--border);border-radius:8px;padding:8px 10px;font-size:14px;
+    * { box-sizing: border-box; }
+    html, body {
+      margin: 0;
+      padding: 0;
+      width: 100%;
+      background: var(--bg);
+      color: var(--text);
+      font-family: var(--font);
+      font-size: 13px;
+      overflow-x: hidden;
     }
-    select{background:#fff;color:var(--text)}
-    button{margin-top:8px;border:none;background:linear-gradient(90deg,var(--accent),var(--accent2));color:#fff;font-weight:700;cursor:pointer}
-    button:disabled{opacity:.45;cursor:not-allowed}
-    .msg{margin-top:8px;font-size:12px;line-height:1.45}
-    .msg.ok{color:var(--ok)}
-    .msg.err{color:var(--err)}
-    .row{display:flex;gap:8px;align-items:center}
-    .mono{font-family:ui-monospace,Menlo,Consolas,monospace}
-    .current{margin-top:8px;padding:8px;border:1px dashed var(--border);border-radius:8px;font-size:12px;background:#fbfcff}
-    a{color:#2563eb;text-decoration:none}
+    body { padding: 4px; }
+    .card {
+      width: 100%;
+      max-width: 100%;
+      background: var(--card);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      padding: 8px;
+    }
+    .head {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      margin-bottom: 8px;
+      min-width: 0;
+    }
+    .logo {
+      width: 16px;
+      height: 16px;
+      border-radius: 4px;
+      background: linear-gradient(135deg, #ff4d7e, #8f67ff);
+      flex-shrink: 0;
+    }
+    .ttl {
+      font-size: 13px;
+      font-weight: 700;
+      line-height: 1.2;
+    }
+    .sub {
+      font-size: 11px;
+      color: var(--muted);
+      margin-top: 1px;
+    }
+    .line {
+      font-size: 11px;
+      color: var(--muted);
+      margin-bottom: 8px;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }
+    select,
+    button {
+      width: 100%;
+      min-width: 0;
+      border-radius: 6px;
+      font-size: 13px;
+      padding: 8px 10px;
+    }
+    select {
+      border: 1px solid var(--border);
+      background: #fff;
+      color: var(--text);
+    }
+    button {
+      margin-top: 8px;
+      border: none;
+      background: linear-gradient(90deg, var(--accent), var(--accent2));
+      color: #fff;
+      font-weight: 700;
+      cursor: pointer;
+    }
+    button:disabled {
+      opacity: 0.45;
+      cursor: not-allowed;
+    }
+    .msg {
+      margin-top: 8px;
+      font-size: 12px;
+      line-height: 1.4;
+      word-break: break-word;
+    }
+    .msg.ok { color: var(--ok); }
+    .msg.err { color: var(--err); }
+    .mono { font-family: ui-monospace, Menlo, Consolas, monospace; }
+    .current {
+      margin-top: 8px;
+      padding: 8px;
+      border: 1px dashed var(--border);
+      border-radius: 6px;
+      font-size: 12px;
+      background: #fbfcff;
+      word-break: break-word;
+    }
+    a { color: #2563eb; text-decoration: none; }
   </style>
   <script src="//api.bitrix24.com/api/v1/"></script>
 </head>
 <body>
-  <div class="wrap">
-    <div class="card">
-      <div class="head">
-        <div class="logo"></div>
-        <div>
-          <div class="ttl">Doczilla PRO</div>
-          <div class="sub">Генерация документа для лида</div>
-        </div>
+  <div class="card">
+    <div class="head">
+      <div class="logo"></div>
+      <div>
+        <div class="ttl">Doczilla PRO</div>
+        <div class="sub">Генерация документа</div>
       </div>
-      <div class="line" id="ctxLine">Лид: —</div>
-
-      <select id="templateSelect">
-        <option value="">— выберите шаблон —</option>
-      </select>
-      <button id="generateBtn" type="button" disabled>Создать документ</button>
-
-      <div class="msg" id="msg"></div>
-      <div class="current" id="currentValue" style="display:none"></div>
     </div>
+    <div class="line" id="ctxLine">CRM элемент: —</div>
+
+    <select id="templateSelect">
+      <option value="">— выберите шаблон —</option>
+    </select>
+    <button id="generateBtn" type="button" disabled>Создать документ</button>
+
+    <div class="msg" id="msg"></div>
+    <div class="current" id="currentValue" style="display:none"></div>
   </div>
 
 <script>
 const API_BASE = '';
 const state = {
-  leadId: '',
+  entityType: 'lead',
+  entityId: '',
   domain: '',
   authId: '',
   mode: 'edit',
   value: '',
+};
+
+const ENTITY_LABELS = {
+  lead: 'Лид',
+  deal: 'Сделка',
+  contact: 'Контакт',
+  company: 'Компания',
 };
 
 const els = {
@@ -75,9 +163,16 @@ const els = {
   current: document.getElementById('currentValue'),
 };
 
+function fitWindow() {
+  if (window.BX24 && typeof BX24.fitWindow === 'function') {
+    try { BX24.fitWindow(); } catch (_e) {}
+  }
+}
+
 function setMessage(text, type = '') {
   els.msg.className = `msg ${type}`.trim();
   els.msg.textContent = text || '';
+  setTimeout(fitWindow, 0);
 }
 
 function safeJsonParse(v) {
@@ -92,6 +187,25 @@ function firstNonEmpty(...vals) {
     if (s) return s;
   }
   return '';
+}
+
+function firstNumeric(...vals) {
+  for (const v of vals) {
+    if (v === null || v === undefined) continue;
+    const s = String(v).trim();
+    if (/^\d+$/.test(s)) return String(Number(s));
+  }
+  return '';
+}
+
+function normalizeEntityType(value) {
+  const raw = String(value || '').trim().toLowerCase();
+  if (!raw) return 'lead';
+  if (raw === 'lead' || raw.includes('crm_lead')) return 'lead';
+  if (raw === 'deal' || raw.includes('crm_deal')) return 'deal';
+  if (raw === 'contact' || raw.includes('crm_contact')) return 'contact';
+  if (raw === 'company' || raw.includes('crm_company')) return 'company';
+  return 'lead';
 }
 
 function getQueryParams() {
@@ -124,9 +238,18 @@ function bxSetValue(value) {
   });
 }
 
+async function readJsonSafe(response) {
+  const raw = await response.text();
+  if (!raw) return {};
+  try { return JSON.parse(raw); } catch { return { detail: raw }; }
+}
+
 async function loadTemplates() {
   const r = await fetch(`${API_BASE}/api/widget-config`);
-  const data = await r.json();
+  const data = await readJsonSafe(r);
+  if (!r.ok) {
+    throw new Error(String(data?.detail || data?.error || `HTTP ${r.status}`));
+  }
   const list = Array.isArray(data?.templates) ? data.templates : [];
   for (const t of list) {
     const o = document.createElement('option');
@@ -134,12 +257,13 @@ async function loadTemplates() {
     o.textContent = String(t.name || t.key || '');
     els.sel.appendChild(o);
   }
+  fitWindow();
 }
 
 function updateUiByMode() {
   const canEdit = String(state.mode || '').toLowerCase() === 'edit';
   els.sel.disabled = !canEdit;
-  els.btn.disabled = !canEdit || !state.leadId || !els.sel.value;
+  els.btn.disabled = !canEdit || !state.entityId || !els.sel.value;
 
   if (!canEdit) {
     els.current.style.display = 'block';
@@ -159,18 +283,19 @@ function updateUiByMode() {
   } else {
     els.current.style.display = 'none';
   }
+  setTimeout(fitWindow, 0);
 }
 
 async function generate() {
   const templateKey = els.sel.value;
-  if (!templateKey || !state.leadId) return;
+  if (!templateKey || !state.entityId) return;
 
   els.btn.disabled = true;
   setMessage('Генерируем документ…');
   try {
     const payload = {
-      entity_type: 'lead',
-      entity_id: String(state.leadId),
+      entity_type: String(state.entityType),
+      entity_id: String(state.entityId),
       template_key: String(templateKey),
       bitrix_domain: state.domain || undefined,
       bitrix_token: state.authId || undefined,
@@ -180,7 +305,7 @@ async function generate() {
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(payload),
     });
-    const data = await r.json();
+    const data = await readJsonSafe(r);
     if (!r.ok || data?.status !== 'success') {
       throw new Error(String(data?.detail || data?.error || `HTTP ${r.status}`));
     }
@@ -189,7 +314,7 @@ async function generate() {
     if (!link) throw new Error('Сервис не вернул ссылку на документ');
 
     await bxSetValue(link);
-    setMessage(`Ссылка сохранена в поле лида. ${data.doc_name || ''}`.trim(), 'ok');
+    setMessage(`Ссылка сохранена в поле. ${data.doc_name || ''}`.trim(), 'ok');
 
     const escaped = link
       .replace(/&/g, '&amp;')
@@ -202,10 +327,12 @@ async function generate() {
       els.sel.value = '';
       setMessage('Готово. Можно выбрать другой шаблон.');
       updateUiByMode();
-    }, 1200);
+    }, 900);
   } catch (e) {
     setMessage(e?.message || 'Ошибка генерации', 'err');
     updateUiByMode();
+  } finally {
+    setTimeout(fitWindow, 0);
   }
 }
 
@@ -220,11 +347,21 @@ async function init() {
     )
   );
 
-  state.leadId = firstNonEmpty(
+  state.entityType = normalizeEntityType(firstNonEmpty(
+    qp.ENTITY_TYPE,
+    opts?.ENTITY_ID,
+    opts?.entityId,
+    placement?.ENTITY_ID,
+    placement?.entityId,
+    qp.ENTITY_ID
+  ));
+  state.entityId = firstNumeric(
     opts?.ENTITY_VALUE_ID,
     opts?.entityValueId,
     opts?.ID,
+    qp.ENTITY_VALUE_ID,
     qp.LEAD_ID,
+    qp.DEAL_ID,
     qp.ID
   );
   state.mode = String(firstNonEmpty(opts?.MODE, qp.MODE, 'edit')).toLowerCase();
@@ -232,14 +369,16 @@ async function init() {
   state.domain = firstNonEmpty(auth?.domain, qp.DOMAIN);
   state.authId = firstNonEmpty(auth?.access_token, auth?.AUTH_ID);
 
-  els.ctx.textContent = `Лид: ${state.leadId ? '#' + state.leadId : '—'}`;
+  const label = ENTITY_LABELS[state.entityType] || 'CRM элемент';
+  els.ctx.textContent = `${label}: ${state.entityId ? '#' + state.entityId : '—'}`;
 
   try {
     await loadTemplates();
   } catch (e) {
-    setMessage('Не удалось загрузить шаблоны', 'err');
+    setMessage(`Не удалось загрузить шаблоны: ${e?.message || e}`, 'err');
   }
   updateUiByMode();
+  fitWindow();
 }
 
 els.sel.addEventListener('change', updateUiByMode);

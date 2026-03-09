@@ -262,6 +262,78 @@ class DocumentGenerationService:
             warnings=warnings,
         )
 
+    async def generate_for_contact(self, contact_id: str, template_key: str) -> GenerationResult:
+        """
+        Генерация документа для контакта.
+        """
+        template = self._load_template(template_key)
+        logger.info("contact=%s шаблон=%s: получаем данные из Б24", contact_id, template_key)
+        contact = await self.bitrix.get_contact(contact_id)
+
+        company = None
+        company_id = contact.get("COMPANY_ID")
+        if company_id:
+            try:
+                company = await self.bitrix.get_company(company_id)
+            except Exception as e:
+                logger.warning("contact=%s: не удалось загрузить компанию: %s", contact_id, e)
+
+        payload = build_fill_payload(template, deal={}, contact=contact, company=company, lead=None)
+        doc_name = build_doc_name(template, contact)
+        warnings: list[str] = []
+        non_empty = self._count_non_empty_payload(payload)
+        logger.info("contact=%s: payload %d переменных (непустых=%d)", contact_id, len(payload), non_empty)
+
+        doc_id, doc_link = await self._create_and_fill_doc(
+            template=template,
+            payload=payload,
+            doc_name=doc_name,
+            log_prefix=f"contact={contact_id}",
+        )
+        logger.info("contact=%s: ✅ готово, doc_id=%s", contact_id, doc_id)
+        return GenerationResult(
+            doc_id=doc_id,
+            doc_link=doc_link,
+            doc_name=doc_name,
+            template_id=template.id,
+            result_mode="link",
+            save_link=False,
+            save_pdf=False,
+            warnings=warnings,
+        )
+
+    async def generate_for_company(self, company_id: str, template_key: str) -> GenerationResult:
+        """
+        Генерация документа для компании.
+        """
+        template = self._load_template(template_key)
+        logger.info("company=%s шаблон=%s: получаем данные из Б24", company_id, template_key)
+        company = await self.bitrix.get_company(company_id)
+
+        payload = build_fill_payload(template, deal={}, contact=None, company=company, lead=None)
+        doc_name = build_doc_name(template, company)
+        warnings: list[str] = []
+        non_empty = self._count_non_empty_payload(payload)
+        logger.info("company=%s: payload %d переменных (непустых=%d)", company_id, len(payload), non_empty)
+
+        doc_id, doc_link = await self._create_and_fill_doc(
+            template=template,
+            payload=payload,
+            doc_name=doc_name,
+            log_prefix=f"company={company_id}",
+        )
+        logger.info("company=%s: ✅ готово, doc_id=%s", company_id, doc_id)
+        return GenerationResult(
+            doc_id=doc_id,
+            doc_link=doc_link,
+            doc_name=doc_name,
+            template_id=template.id,
+            result_mode="link",
+            save_link=False,
+            save_pdf=False,
+            warnings=warnings,
+        )
+
 
 def _make_pdf_filename(doc_name: str) -> str:
     name = (doc_name or "document").strip()

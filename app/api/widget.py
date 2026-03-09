@@ -7,6 +7,8 @@
 """
 from pathlib import Path
 import logging
+import json
+import re
 from urllib.parse import urlencode
 
 import httpx
@@ -48,6 +50,30 @@ def _safe_int(value, default: int = 3600) -> int:
         return max(int(str(value)), 120)
     except Exception:
         return default
+
+
+def _pick_numeric(*values) -> str | None:
+    for value in values:
+        if value is None:
+            continue
+        text = str(value).strip()
+        if not text:
+            continue
+        if re.fullmatch(r"\d+", text):
+            return str(int(text))
+    return None
+
+
+def _safe_json(value) -> dict:
+    if not value:
+        return {}
+    if isinstance(value, dict):
+        return value
+    try:
+        parsed = json.loads(str(value))
+        return parsed if isinstance(parsed, dict) else {}
+    except Exception:
+        return {}
 
 
 def _iter_placements(raw_result):
@@ -210,13 +236,25 @@ def _is_runtime_placement(form: dict, params: dict) -> bool:
 
 
 def _build_widget_redirect_target(request: Request, params: dict, form: dict) -> str:
-    deal_id = _pick(
+    placement_options = _pick(
+        form.get("PLACEMENT_OPTIONS"),
+        params.get("PLACEMENT_OPTIONS"),
+        form.get("placement_options"),
+        params.get("placement_options"),
+    )
+    placement_data = _safe_json(placement_options)
+    deal_id = _pick_numeric(
         params.get("DEAL_ID"),
         form.get("DEAL_ID"),
         form.get("deal_id"),
+        params.get("ID"),
         form.get("ID"),
-        form.get("ENTITY_ID"),
+        params.get("ENTITY_VALUE_ID"),
         form.get("ENTITY_VALUE_ID"),
+        placement_data.get("ID"),
+        placement_data.get("id"),
+        placement_data.get("ENTITY_VALUE_ID"),
+        placement_data.get("entityValueId"),
     )
     domain = _normalize_domain(_pick(
         params.get("DOMAIN"),
@@ -226,12 +264,6 @@ def _build_widget_redirect_target(request: Request, params: dict, form: dict) ->
         form.get("auth[domain]"),
         params.get("auth[domain]"),
     ))
-    placement_options = _pick(
-        form.get("PLACEMENT_OPTIONS"),
-        params.get("PLACEMENT_OPTIONS"),
-        form.get("placement_options"),
-        params.get("placement_options"),
-    )
 
     qs = {}
     if deal_id:
@@ -257,7 +289,7 @@ async def serve_widget_get(request: Request):
 
 @router.get("/bitrix/lead-userfield", response_class=FileResponse, include_in_schema=False)
 async def serve_lead_userfield_get(request: Request):
-    """GET — обработчик пользовательского типа поля (USERFIELD_TYPE) для лида."""
+    """GET — обработчик пользовательского типа поля (USERFIELD_TYPE) для CRM-сущностей."""
     return FileResponse(STATIC_DIR / "lead_userfield.html", media_type="text/html", headers=NO_CACHE_HEADERS)
 
 
@@ -281,23 +313,37 @@ async def serve_widget_post(request: Request):
     form = dict(await request.form())
     logger.info("widget POST form keys: %s", sorted(form.keys()))
 
-    deal_id = _pick(
+    placement_options = _pick(
+        form.get("PLACEMENT_OPTIONS"),
+        form.get("placement_options"),
+    )
+    placement_data = _safe_json(placement_options)
+    deal_id = _pick_numeric(
         form.get("DEAL_ID"),
         form.get("deal_id"),
         form.get("ID"),
-        form.get("ENTITY_ID"),
         form.get("ENTITY_VALUE_ID"),
+        placement_data.get("ID"),
+        placement_data.get("id"),
+        placement_data.get("ENTITY_VALUE_ID"),
+        placement_data.get("entityValueId"),
     )
     domain = _normalize_domain(_pick(
         form.get("DOMAIN"),
         form.get("domain"),
         form.get("auth[domain]"),
     ))
-    placement_options = _pick(
-        form.get("PLACEMENT_OPTIONS"),
-        form.get("placement_options"),
-    )
     template_key = _pick(form.get("template_key"), form.get("TEMPLATE_KEY"))
+    entity_type_raw = str(_pick(form.get("ENTITY_ID"), form.get("entity_id")) or "").strip().upper()
+    entity_type = None
+    if entity_type_raw == "CRM_LEAD":
+        entity_type = "lead"
+    elif entity_type_raw == "CRM_CONTACT":
+        entity_type = "contact"
+    elif entity_type_raw == "CRM_COMPANY":
+        entity_type = "company"
+    elif entity_type_raw == "CRM_DEAL":
+        entity_type = "deal"
 
     qs = {}
     if deal_id:
@@ -308,6 +354,8 @@ async def serve_widget_post(request: Request):
         qs["PLACEMENT_OPTIONS"] = placement_options
     if template_key:
         qs["TEMPLATE_KEY"] = template_key
+    if entity_type:
+        qs["ENTITY_TYPE"] = entity_type
 
     target = str(request.url_for("serve_widget_get"))
     if qs:
@@ -324,11 +372,22 @@ async def serve_lead_userfield_post(request: Request):
     form = dict(await request.form())
     logger.info("lead-userfield POST form keys: %s", sorted(form.keys()))
 
-    lead_id = _pick(
+    entity_type_raw = str(_pick(
+        form.get("ENTITY_ID"),
+        form.get("entity_id"),
+    ) or "").strip().upper()
+    entity_type = "lead"
+    if entity_type_raw == "CRM_DEAL":
+        entity_type = "deal"
+    elif entity_type_raw == "CRM_CONTACT":
+        entity_type = "contact"
+    elif entity_type_raw == "CRM_COMPANY":
+        entity_type = "company"
+
+    lead_id = _pick_numeric(
         form.get("LEAD_ID"),
         form.get("lead_id"),
         form.get("ID"),
-        form.get("ENTITY_ID"),
         form.get("ENTITY_VALUE_ID"),
     )
     domain = _normalize_domain(_pick(
@@ -342,8 +401,11 @@ async def serve_lead_userfield_post(request: Request):
     qs = {}
     if lead_id:
         qs["LEAD_ID"] = lead_id
+        qs["ENTITY_VALUE_ID"] = lead_id
     if domain:
         qs["DOMAIN"] = domain
+    if entity_type:
+        qs["ENTITY_TYPE"] = entity_type
     if value:
         qs["VALUE"] = value
     if mode:

@@ -260,6 +260,7 @@
 const params = new URLSearchParams(window.location.search);
 const API_BASE = window.location.origin;
 const ctx = {
+  entityType: 'deal',
   dealId: '',
   dealTitle: '',
   domain: '',
@@ -291,15 +292,24 @@ document.addEventListener('DOMContentLoaded', async () => {
   updateGenerateButtonState();
 
   if (!ctx.dealId) {
-    showError('Не удалось определить ID сделки. Откройте виджет из карточки сделки.');
+    showError('Не удалось определить ID элемента CRM. Откройте виджет из карточки CRM.');
   }
 });
 
 async function loadTemplates() {
   try {
     const res = await fetch(`${API_BASE}/api/widget-config`);
-    if (!res.ok) throw new Error(`HTTP ${res.status}`);
-    const data = await res.json();
+    const raw = await res.text();
+    let data = {};
+    try {
+      data = raw ? JSON.parse(raw) : {};
+    } catch (_e) {
+      if (!res.ok) {
+        throw new Error((raw || `HTTP ${res.status}`).slice(0, 240));
+      }
+      throw new Error('Некорректный JSON в /api/widget-config');
+    }
+    if (!res.ok) throw new Error(data.detail || data.error || `HTTP ${res.status}`);
     const sel = document.getElementById('templateSelect');
     templateMetaByKey.clear();
 
@@ -387,7 +397,7 @@ async function generate() {
   const selectedMode = getSelectedTemplateMode();
 
   if (!ctx.dealId) {
-    showError('Не удалось определить ID сделки. Откройте виджет из карточки сделки.');
+    showError('Не удалось определить ID элемента CRM. Откройте виджет из карточки CRM.');
     return;
   }
 
@@ -406,15 +416,21 @@ async function generate() {
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
         deal_id: ctx.dealId,
+        entity_type: ctx.entityType || 'deal',
+        entity_id: ctx.dealId,
         template_key: templateKey,
         bitrix_token: ctx.token,
         bitrix_domain: ctx.domain,
       }),
     });
-
-    const data = await res.json();
-
-    if (!res.ok) throw new Error(data.detail || `HTTP ${res.status}`);
+    const raw = await res.text();
+    let data = null;
+    try {
+      data = raw ? JSON.parse(raw) : {};
+    } catch (_e) {
+      data = { detail: raw || `HTTP ${res.status}` };
+    }
+    if (!res.ok) throw new Error(data.detail || data.error || `HTTP ${res.status}`);
 
     // Отмечаем все шаги выполненными
     [1,2,3,4,5].forEach(i => setStep(i, 'done'));
@@ -488,16 +504,23 @@ function updateGenerateButtonState() {
 }
 
 function renderDealPill() {
+  const entityLabel = ({
+    deal: 'Сделка',
+    lead: 'Лид',
+    contact: 'Контакт',
+    company: 'Компания',
+  })[ctx.entityType] || 'Сущность';
   const title = (ctx.dealTitle || '').trim();
   if (title) {
     document.getElementById('dealPill').innerHTML =
       `<span></span> ${escHtml(title)} <small style="opacity:.65">#${escHtml(ctx.dealId || '—')}</small>`;
     return;
   }
-  document.getElementById('dealPill').innerHTML = `<span></span> Сделка #${escHtml(ctx.dealId || '—')}`;
+  document.getElementById('dealPill').innerHTML = `<span></span> ${entityLabel} #${escHtml(ctx.dealId || '—')}`;
 }
 
 async function loadDealInfo() {
+  if (ctx.entityType !== 'deal') return;
   if (!ctx.dealId) return;
   try {
     const res = await fetch(`${API_BASE}/api/deal-info`, {
@@ -524,9 +547,16 @@ async function loadDealInfo() {
 
 async function loadDealTitleViaBx24() {
   if (!ctx.dealId || !window.BX24 || typeof BX24.callMethod !== 'function') return '';
+  const methodByEntity = {
+    deal: 'crm.deal.get',
+    lead: 'crm.lead.get',
+    contact: 'crm.contact.get',
+    company: 'crm.company.get',
+  };
+  const method = methodByEntity[ctx.entityType] || methodByEntity.deal;
   const payload = await withTimeout(new Promise(resolve => {
     try {
-      BX24.callMethod('crm.deal.get', { id: ctx.dealId }, (res) => {
+      BX24.callMethod(method, { id: ctx.dealId }, (res) => {
         if (res && typeof res.error === 'function' && res.error()) {
           return resolve(null);
         }
@@ -538,7 +568,21 @@ async function loadDealTitleViaBx24() {
     }
   }), 1400, null);
   if (!payload || typeof payload !== 'object') return '';
-  return String(payload.TITLE || payload.title || '').trim();
+  const title = String(
+    payload.TITLE ||
+    payload.TITLE_NAME ||
+    payload.COMPANY_TITLE ||
+    payload.FULL_NAME ||
+    payload.NAME ||
+    payload.title ||
+    ''
+  ).trim();
+  if (title) return title;
+  const contactName = [payload.LAST_NAME, payload.NAME, payload.SECOND_NAME]
+    .map(v => String(v || '').trim())
+    .filter(Boolean)
+    .join(' ');
+  return contactName;
 }
 
 function buildWarningsHtml(data) {
@@ -570,13 +614,20 @@ function buildSuccessHtml(data, mode) {
 
 async function initContext() {
   const placementOptions = safeJsonParse(params.get('PLACEMENT_OPTIONS'));
-  ctx.dealId = firstNonEmpty(
+  ctx.entityType = normalizeEntityType(firstNonEmpty(
+    params.get('ENTITY_TYPE'),
+    params.get('entity_type'),
+    params.get('ENTITY_ID'),
+    params.get('entity_id'),
+    placementOptions.ENTITY_ID,
+    placementOptions.entityId,
+  ));
+  ctx.dealId = firstNumeric(
     params.get('DEAL_ID'),
     params.get('deal_id'),
     params.get('params[ID]'),
     params.get('params[id]'),
     params.get('ID'),
-    params.get('ENTITY_ID'),
     params.get('ENTITY_VALUE_ID'),
     extractDealId(placementOptions),
   );
@@ -606,7 +657,13 @@ async function initContext() {
   ]);
 
   const optionsFromSdk = safeJsonParse(placementInfo && placementInfo.options);
-  ctx.dealId = firstNonEmpty(
+  ctx.entityType = normalizeEntityType(firstNonEmpty(
+    ctx.entityType,
+    inferEntityType(optionsFromSdk),
+    inferEntityType(placementInfo),
+    inferEntityType(auth),
+  ));
+  ctx.dealId = firstNumeric(
     ctx.dealId,
     extractDealId(optionsFromSdk),
     extractDealId(placementInfo),
@@ -635,6 +692,40 @@ function firstNonEmpty(...values) {
   return '';
 }
 
+function firstNumeric(...values) {
+  for (const value of values) {
+    if (value === null || value === undefined) continue;
+    const text = String(value).trim();
+    if (!text) continue;
+    if (/^\d+$/.test(text)) return String(Number(text));
+  }
+  return '';
+}
+
+function normalizeEntityType(value) {
+  const raw = String(value || '').trim().toLowerCase();
+  if (!raw) return 'deal';
+  if (raw === 'deal' || raw.includes('crm_deal')) return 'deal';
+  if (raw === 'lead' || raw.includes('crm_lead')) return 'lead';
+  if (raw === 'contact' || raw.includes('crm_contact')) return 'contact';
+  if (raw === 'company' || raw.includes('crm_company')) return 'company';
+  return 'deal';
+}
+
+function inferEntityType(source) {
+  if (!source || typeof source !== 'object') return '';
+  return firstNonEmpty(
+    source.ENTITY_TYPE,
+    source.entity_type,
+    source.ENTITY_ID,
+    source.entityId,
+    source.TYPE,
+    source.type,
+    source.PLACEMENT,
+    source.placement,
+  );
+}
+
 function normalizeDomain(value) {
   if (!value) return '';
   return String(value)
@@ -655,14 +746,12 @@ function safeJsonParse(value) {
 
 function extractDealId(source) {
   if (!source || typeof source !== 'object') return '';
-  return firstNonEmpty(
+  return firstNumeric(
     source.ID,
     source.id,
     source.DEAL_ID,
     source.deal_id,
     source.dealId,
-    source.ENTITY_ID,
-    source.entityId,
     source.ENTITY_VALUE_ID,
     source.entityValueId,
   );

@@ -14,6 +14,7 @@ FastAPI — точка входа.
 import logging
 from contextlib import asynccontextmanager
 from pathlib import Path
+import re
 
 from fastapi import FastAPI, HTTPException
 from fastapi.responses import FileResponse, HTMLResponse
@@ -122,7 +123,7 @@ async def admin_panel():
 class GenerateRequest(BaseModel):
     deal_id: str | None = None
     lead_id: str | None = None
-    entity_type: str | None = None  # deal | lead
+    entity_type: str | None = None  # deal | lead | contact | company
     entity_id: str | None = None
     template_key: str = "contract"
     bitrix_domain: str | None = None
@@ -135,11 +136,24 @@ class DealInfoRequest(BaseModel):
     bitrix_token: str | None = None
 
 
+def _normalize_numeric_id(value: str | None) -> str:
+    raw = str(value or "").strip()
+    if not raw:
+        return ""
+    if not re.fullmatch(r"\d+", raw):
+        return ""
+    return str(int(raw))
+
+
 @app.post("/api/deal-info")
 async def deal_info(req: DealInfoRequest):
     """Получить ID и название сделки для UI виджета."""
     client: BitrixClient | None = None
     try:
+        deal_id = _normalize_numeric_id(req.deal_id)
+        if not deal_id:
+            raise HTTPException(400, "Некорректный ID сделки")
+
         if req.bitrix_domain:
             domain = req.bitrix_domain
         else:
@@ -153,12 +167,16 @@ async def deal_info(req: DealInfoRequest):
             raise HTTPException(400, "Не указан domain портала Б24")
 
         client = BitrixClient(domain=domain, access_token=req.bitrix_token)
-        deal = await client.get_deal(req.deal_id)
-        deal_id = str(deal.get("ID") or req.deal_id)
+        deal = await client.get_deal(deal_id)
+        deal_id = str(deal.get("ID") or deal_id)
         title = str(deal.get("TITLE") or f"Сделка #{deal_id}")
         return {"id": deal_id, "title": title}
+    except HTTPException:
+        raise
     except BitrixError as e:
         raise HTTPException(502, str(e))
+    except Exception as e:
+        raise HTTPException(502, f"Ошибка запроса к Б24: {e}")
     finally:
         if client:
             await client.close()
@@ -182,8 +200,11 @@ async def manual_generate(req: GenerateRequest):
             entity_id = str(req.deal_id or "")
     if not entity_id:
         raise HTTPException(400, "Не указан entity_id/deal_id/lead_id")
-    if entity_type not in {"deal", "lead"}:
-        raise HTTPException(400, "entity_type должен быть 'deal' или 'lead'")
+    if entity_type not in {"deal", "lead", "contact", "company"}:
+        raise HTTPException(400, "entity_type должен быть: deal|lead|contact|company")
+    entity_id = _normalize_numeric_id(entity_id)
+    if not entity_id:
+        raise HTTPException(400, "Некорректный ID сущности")
 
     def _safe_create_log() -> None:
         nonlocal log_id
@@ -218,6 +239,10 @@ async def manual_generate(req: GenerateRequest):
         svc, owns_bitrix_client = _build_generation_service(req.bitrix_domain, req.bitrix_token)
         if entity_type == "lead":
             result = await svc.generate_for_lead(entity_id, req.template_key)
+        elif entity_type == "contact":
+            result = await svc.generate_for_contact(entity_id, req.template_key)
+        elif entity_type == "company":
+            result = await svc.generate_for_company(entity_id, req.template_key)
         else:
             result = await svc.generate_for_deal(entity_id, req.template_key)
         _safe_update_log(

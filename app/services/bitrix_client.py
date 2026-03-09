@@ -144,9 +144,27 @@ class BitrixClient:
             params={"auth": access_token},
             json=params or {}
         )
+        data: dict[str, Any] | None = None
+        try:
+            parsed = response.json()
+            if isinstance(parsed, dict):
+                data = parsed
+        except Exception:
+            data = None
 
-        response.raise_for_status()
-        data = response.json()
+        if response.status_code >= 400:
+            if data and data.get("error"):
+                raise BitrixError(f"{data['error']}: {data.get('error_description', '')}")
+            text = ""
+            try:
+                text = (response.text or "").strip()
+            except Exception:
+                text = ""
+            reason = text[:300] if text else f"HTTP {response.status_code}"
+            raise BitrixError(f"REST {method}: {reason}")
+
+        if not data:
+            raise BitrixError(f"REST {method}: пустой или некорректный JSON-ответ")
 
         if "error" in data:
             raise BitrixError(f"{data['error']}: {data.get('error_description', '')}")
