@@ -1,0 +1,32 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="UTF-8">
+<title>Установка Doczilla Integration</title>
+<style>
+  body { font-family: sans-serif; display: flex; align-items: center;
+         justify-content: center; height: 100vh; margin: 0;
+         background: #f5f5f5; color: #333; }
+  .box { text-align: center; padding: 40px; }
+  .spinner { width: 32px; height: 32px; border: 3px solid #ddd;
+             border-top-color: #4f7cff; border-radius: 50%;
+             animation: spin .7s linear infinite; margin: 16px auto; }
+  @keyframes spin { to { transform: rotate(360deg); } }
+</style>
+</head>
+<body>
+<div class="box">
+  <div>📄</div>
+  <div style="font-size:18px;font-weight:600;margin:12px 0">Doczilla Integration</div>
+  <div class="spinner"></div>
+  <div style="color:#888;font-size:13px">Установка приложения…</div>
+</div>
+<script src="//api.bitrix24.com/api/v1/"></script>
+<script>
+  BX24.init(function() {
+    // Сообщаем Б24 что установка завершена
+    BX24.installFinish();
+  });
+</script>
+</body>
+</html>
