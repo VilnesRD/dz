@@ -111,6 +111,10 @@ async def health():
 async def admin_panel():
     return FileResponse(STATIC_DIR / "admin.html")
 
+@app.get("/webhook/bitrix")
+async def bitrix_webhook_get():
+    """GET-пинг от Б24 при установке приложения."""
+    return {"status": "ok"}
 
 @app.post("/webhook/bitrix")
 async def bitrix_webhook(
