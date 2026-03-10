@@ -206,6 +206,32 @@ class DocumentGenerationService:
         if not doc_id:
             raise RuntimeError("Doczilla createDocz не вернул ID документа")
         logger.info("%s: doc_id=%s link_code=%s, заполняем переменные", log_prefix, doc_id, doc_link_code or "-")
+
+        # Диагностика прав доступа в Doczilla: документ создаётся от service-аккаунта.
+        # Это помогает понять, почему у конечного пользователя может быть "нет доступа".
+        try:
+            info = await self.doczilla.get_document_info_by_id(doc_id)
+            if isinstance(info, dict):
+                access = str(info.get("access") or "").strip()
+                folder_id = str(info.get("folderId") or "").strip()
+                owner_login = str(
+                    info.get("author.login")
+                    or info.get("user.login")
+                    or ""
+                ).strip()
+                shared_to = str(info.get("sharedToEmailId") or "").strip()
+                logger.info(
+                    "%s: doc access snapshot id=%s owner=%s folder=%s access=%s sharedTo=%s",
+                    log_prefix,
+                    doc_id,
+                    owner_login or "-",
+                    folder_id or "-",
+                    access or "-",
+                    shared_to or "-",
+                )
+        except Exception as e:
+            logger.warning("%s: не удалось получить access snapshot doc_id=%s: %s", log_prefix, doc_id, e)
+
         await self.doczilla.fill_docz(doc_id, payload)
         return doc_id, self._build_doc_link(doc_id, doc_link_code)
 
