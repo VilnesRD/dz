@@ -242,7 +242,14 @@ class DocumentGenerationService:
         # ── 3. Маппинг полей ──────────────────────────────────────────────────
         diagnostics: list[dict[str, str]] = []
         payload = build_fill_payload(template, deal, contact, company, lead=None, diagnostics=diagnostics)
-        doc_name = build_doc_name(template, deal)
+        doc_name = build_doc_name(
+            template,
+            deal=deal,
+            contact=contact,
+            company=company,
+            lead=None,
+            entity_type="deal",
+        )
         warnings: list[str] = self._build_empty_source_warnings(diagnostics)
         non_empty = self._count_non_empty_payload(payload)
         logger.info("deal=%s: payload %d переменных (непустых=%d)", deal_id, len(payload), non_empty)
@@ -346,7 +353,14 @@ class DocumentGenerationService:
 
         diagnostics: list[dict[str, str]] = []
         payload = build_fill_payload(template, deal={}, contact=contact, company=company, lead=lead, diagnostics=diagnostics)
-        doc_name = build_doc_name(template, lead)
+        doc_name = build_doc_name(
+            template,
+            deal=None,
+            contact=contact,
+            company=company,
+            lead=lead,
+            entity_type="lead",
+        )
         warnings: list[str] = self._build_empty_source_warnings(diagnostics)
         non_empty = self._count_non_empty_payload(payload)
         logger.info("lead=%s: payload %d переменных (непустых=%d)", lead_id, len(payload), non_empty)
@@ -391,7 +405,14 @@ class DocumentGenerationService:
 
         diagnostics: list[dict[str, str]] = []
         payload = build_fill_payload(template, deal={}, contact=contact, company=company, lead=None, diagnostics=diagnostics)
-        doc_name = build_doc_name(template, contact)
+        doc_name = build_doc_name(
+            template,
+            deal=None,
+            contact=contact,
+            company=company,
+            lead=None,
+            entity_type="contact",
+        )
         warnings: list[str] = self._build_empty_source_warnings(diagnostics)
         non_empty = self._count_non_empty_payload(payload)
         logger.info("contact=%s: payload %d переменных (непустых=%d)", contact_id, len(payload), non_empty)
@@ -425,7 +446,14 @@ class DocumentGenerationService:
 
         diagnostics: list[dict[str, str]] = []
         payload = build_fill_payload(template, deal={}, contact=None, company=company, lead=None, diagnostics=diagnostics)
-        doc_name = build_doc_name(template, company)
+        doc_name = build_doc_name(
+            template,
+            deal=None,
+            contact=None,
+            company=company,
+            lead=None,
+            entity_type="company",
+        )
         warnings: list[str] = self._build_empty_source_warnings(diagnostics)
         non_empty = self._count_non_empty_payload(payload)
         logger.info("company=%s: payload %d переменных (непустых=%d)", company_id, len(payload), non_empty)

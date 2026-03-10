@@ -99,16 +99,82 @@ def build_fill_payload(
     return payload
 
 
-def build_doc_name(template: Template, deal: dict) -> str:
-    """Сформировать имя файла по шаблону строки doc_name_template."""
+def build_doc_name(
+    template: Template,
+    deal: dict | None = None,
+    contact: dict | None = None,
+    company: dict | None = None,
+    lead: dict | None = None,
+    entity_type: str = "deal",
+) -> str:
+    """
+    Сформировать имя файла по doc_name_template.
+
+    Поддержка плейсхолдеров:
+      {date}            → текущая дата (DD.MM.YYYY)
+      {date:%Y-%m-%d}   → текущая дата в указанном формате strftime
+      {deal_id}         → ID текущей сущности (или сделки)
+      {company}         → COMPANY_TITLE сделки / TITLE компании
+      {deal.FIELD} / {lead.FIELD} / {contact.FIELD} / {company.FIELD}
+    """
+    pattern = str(getattr(template, "doc_name_template", "") or "").strip() or "Документ {deal_id}"
+    sources = {
+        "deal": deal or {},
+        "lead": lead or {},
+        "contact": contact or {},
+        "company": company or {},
+        "doc": {},
+    }
+    active_type = str(entity_type or "deal").strip().lower()
+    if active_type not in sources:
+        active_type = "deal"
+    active = sources.get(active_type) or {}
+
+    deal_obj = sources["deal"] or active
+    company_obj = sources["company"] or {}
+    deal_id = _stringify_value(
+        active.get("ID")
+        or deal_obj.get("ID")
+        or ""
+    )
+    company_name = _stringify_value(
+        company_obj.get("TITLE")
+        or deal_obj.get("COMPANY_TITLE")
+        or ""
+    )
+
+    def repl(match: re.Match[str]) -> str:
+        token = str(match.group(1) or "").strip()
+        if not token:
+            return ""
+        low = token.lower()
+        if low == "date":
+            return datetime.now().strftime("%d.%m.%Y")
+        if low.startswith("date:"):
+            fmt = token.split(":", 1)[1].strip() or "%d.%m.%Y"
+            try:
+                return datetime.now().strftime(fmt)
+            except Exception:
+                return datetime.now().strftime("%d.%m.%Y")
+        if low == "deal_id":
+            return deal_id
+        if low == "company":
+            return company_name
+        if "." in token:
+            return _get_field(token, sources)
+        return _stringify_value(active.get(token) or active.get(token.upper()) or "")
+
     try:
-        return template.doc_name_template.format(
-            deal_id=deal.get("ID", ""),
-            company=deal.get("COMPANY_TITLE", ""),
-            date=datetime.now().strftime("%d.%m.%Y"),
-        )
+        rendered = re.sub(r"\{([^{}]+)\}", repl, pattern)
+        rendered = re.sub(r"\s+", " ", rendered).strip()
+        if rendered:
+            return rendered
     except Exception:
-        return f"Документ {deal.get('ID','')}"
+        pass
+
+    if deal_id:
+        return f"Документ {deal_id}"
+    return "Документ"
 
 
 # ── Резолверы ─────────────────────────────────────────────────────────────────

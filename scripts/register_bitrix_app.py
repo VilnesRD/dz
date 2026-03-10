@@ -27,6 +27,7 @@ from app.services.bitrix_client import BitrixClient
 
 settings = get_settings()
 WIDGET_URL = f"{settings.APP_PUBLIC_URL.rstrip('/')}/bitrix/widget"
+ICON_URL = f"{settings.APP_PUBLIC_URL.rstrip('/')}/assets/doczilla-logo.png"
 TARGET_PLACEMENT = "CRM_DEAL_DETAIL_TOOLBAR"
 USERFIELD_HANDLER_URL = f"{settings.APP_PUBLIC_URL.rstrip('/')}/bitrix/lead-userfield"
 DEFAULT_USERFIELD_TYPE = "doczilla_field"
@@ -111,8 +112,9 @@ async def register(domain: str):
         bind_result = await client.call("placement.bind", {
             "PLACEMENT": TARGET_PLACEMENT,
             "HANDLER": WIDGET_URL,
-            "TITLE": "📄 Создать документ",
+            "TITLE": "Создать документ в Doczilla",
             "DESCRIPTION": "Генерация PDF через Doczilla PRO",
+            "ICON": ICON_URL,
         })
         print(f"placement.bind {TARGET_PLACEMENT}: {bind_result}")
 

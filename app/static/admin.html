@@ -75,6 +75,42 @@ textarea{resize:vertical;min-height:56px}
 .empty{text-align:center;padding:44px;color:var(--muted);font-size:13px}
 .mono{font-family:var(--mono);font-size:12px}
 .hint{font-size:12px;color:var(--muted);margin-top:4px;font-family:var(--mono)}
+.docname-builder{
+  margin-top:8px;
+  border:1px solid var(--border);
+  border-radius:8px;
+  background:var(--surface2);
+  padding:10px;
+}
+.docname-row{
+  display:flex;
+  gap:8px;
+  align-items:center;
+  margin-bottom:8px;
+}
+.docname-row:last-child{margin-bottom:0}
+.docname-row select{flex:1;min-width:0}
+.docname-examples{
+  display:flex;
+  gap:6px;
+  flex-wrap:wrap;
+}
+.docname-chip{
+  display:inline-flex;
+  align-items:center;
+  gap:4px;
+  border:1px solid var(--border2);
+  background:#fff;
+  color:var(--muted);
+  border-radius:999px;
+  padding:4px 10px;
+  font-size:12px;
+  cursor:pointer;
+}
+.docname-chip:hover{
+  border-color:var(--accent);
+  color:var(--accent);
+}
 .alert{padding:11px 14px;border-radius:7px;font-size:13px;margin-bottom:12px}
 .alert-error{background:rgba(239,68,68,.1);border:1px solid rgba(239,68,68,.2);color:var(--danger)}
 .alert-success{background:rgba(34,197,94,.1);border:1px solid rgba(34,197,94,.2);color:var(--success)}
@@ -367,10 +403,10 @@ textarea{resize:vertical;min-height:56px}
       <div class="logo-text">Doczilla<small>Integration Admin</small></div>
     </div>
     <nav>
-      <a href="#" :class="{active:pg==='tmpl'}" @click.prevent="pg='tmpl'">
+      <a href="#" :class="{active:pg==='tmpl'}" @click.prevent="goPage('tmpl')">
         <span class="nav-icon">🗂</span> Шаблоны
       </a>
-      <a href="#" :class="{active:pg==='logs'}" @click.prevent="pg='logs';loadLogs()">
+      <a href="#" :class="{active:pg==='logs'}" @click.prevent="goPage('logs')">
         <span class="nav-icon">📋</span> Логи
       </a>
     </nav>
@@ -439,6 +475,7 @@ textarea{resize:vertical;min-height:56px}
             <div>
               <div style="font-size:17px;font-weight:800" x-text="editTmpl.name"></div>
               <div class="mono" style="color:var(--muted);font-size:11px" x-text="'key: '+editTmpl.key"></div>
+              <div x-show="isMapperDirty()" class="mono" style="color:var(--warn);font-size:11px">Есть несохранённые изменения</div>
             </div>
           </div>
           <div class="flex">
@@ -446,7 +483,7 @@ textarea{resize:vertical;min-height:56px}
             <button class="btn btn-ghost" @click="refreshStruct()" :disabled="loadingStruct">
               <span x-show="loadingStruct" class="spinner-sm"></span>🔄 Обновить
             </button>
-            <button class="btn btn-primary" @click="saveMappings()" :disabled="saving">
+            <button class="btn btn-primary" @click="saveAllAndBack()" :disabled="saving || !isMapperDirty()">
               <span x-show="saving" class="spinner-sm"></span>💾 Сохранить
             </button>
           </div>
@@ -457,9 +494,6 @@ textarea{resize:vertical;min-height:56px}
         <div class="card">
           <div class="flex-between" style="margin-bottom:10px">
             <div style="font-size:15px;font-weight:700">Сохранение результата в Битрикс24</div>
-            <button class="btn btn-ghost btn-sm" @click="saveResultSettings()" :disabled="savingResult">
-              <span x-show="savingResult" class="spinner-sm"></span>Сохранить настройки
-            </button>
           </div>
           <div class="field" style="max-width:320px">
             <label>Режим сохранения</label>
@@ -666,8 +700,8 @@ textarea{resize:vertical;min-height:56px}
                                           </template>
                                         </select>
                                       </template>
-                                      <template x-if="!selectorSourceHasOptions(ensureSelMap(g.self).source_field)">
-                                        <input type="text" x-model="r.value" @input="syncSelMap(g.self)" :placeholder="selRulePlaceholder(r.operator)">
+                                      <template x-if="!selectorSourceHasOptions(ensureSelMap(g.self).source_field) && !selectorOptionsState(ensureSelMap(g.self).source_field).loading">
+                                        <input type="text" x-model="r.value" @input="syncSelMap(g.self)" :placeholder="selectorValuePlaceholder(ensureSelMap(g.self).source_field, r.operator)">
                                       </template>
                                     </div>
                                   </template>
@@ -811,8 +845,8 @@ textarea{resize:vertical;min-height:56px}
                                           </template>
                                         </select>
                                       </template>
-                                      <template x-if="!selectorSourceHasOptions(ensureSelMap(m).source_field)">
-                                        <input type="text" x-model="r.value" @input="syncSelMap(m)" :placeholder="selRulePlaceholder(r.operator)">
+                                      <template x-if="!selectorSourceHasOptions(ensureSelMap(m).source_field) && !selectorOptionsState(ensureSelMap(m).source_field).loading">
+                                        <input type="text" x-model="r.value" @input="syncSelMap(m)" :placeholder="selectorValuePlaceholder(ensureSelMap(m).source_field, r.operator)">
                                       </template>
                                     </div>
                                   </template>
@@ -940,8 +974,28 @@ textarea{resize:vertical;min-height:56px}
     <div class="field"><label>Doczilla Link</label><input type="text" x-model="tForm.doczilla_link" placeholder="SVI8PZ"></div>
     <div class="field"><label>Folder ID</label><input type="text" x-model="tForm.doczilla_folder_id"></div>
     <div class="field"><label>Шаблон имени файла</label>
-      <input type="text" x-model="tForm.doc_name_template" placeholder="Договор {deal_id} от {date}">
-      <div class="hint">{deal_id}, {company}, {date}</div></div>
+      <input type="text" x-model="tForm.doc_name_template" placeholder="Документ {deal.TITLE} от {date}">
+      <div class="docname-builder">
+        <div class="docname-row">
+          <select x-model="docNameToken">
+            <option value="">— выбрать значение для вставки —</option>
+            <option value="{date}">Текущая дата: {date}</option>
+            <option value="{date:%Y-%m-%d}">Текущая дата: {date:%Y-%m-%d}</option>
+            <option value="{deal_id}">ID текущей сущности: {deal_id}</option>
+            <template x-for="f in docNameFieldTokens" :key="'docname-token-'+f.path">
+              <option :value="'{'+f.path+'}'" x-text="f.label + ' → {' + f.path + '}'"></option>
+            </template>
+          </select>
+          <button class="btn btn-ghost btn-sm" type="button" @click="insertDocNameToken()">Вставить</button>
+        </div>
+        <div class="docname-examples">
+          <button class="docname-chip" type="button" @click="insertDocNameToken('{deal.TITLE}')">{deal.TITLE}</button>
+          <button class="docname-chip" type="button" @click="insertDocNameToken('{company.TITLE}')">{company.TITLE}</button>
+          <button class="docname-chip" type="button" @click="insertDocNameToken('{contact.NAME}')">{contact.NAME}</button>
+          <button class="docname-chip" type="button" @click="insertDocNameToken('{date}')">{date}</button>
+        </div>
+      </div>
+      <div class="hint">{deal.FIELD}, {lead.FIELD}, {contact.FIELD}, {company.FIELD}, {date}, {date:%Y-%m-%d}</div></div>
     <div class="hint" style="margin-bottom:10px">Настройка сохранения результата в Б24 выполняется на странице маппинга шаблона.</div>
     <div style="display:flex;gap:8px;justify-content:flex-end;margin-top:8px">
       <button class="btn btn-ghost" @click="showTmplModal=false">Отмена</button>
@@ -998,15 +1052,18 @@ function app() { return {
   tmpls:[], showTmplModal:false, tForm:{}, tErr:'', tLoading:false,
   impLoading:false, impMsg:'', impMsgT:'success', doczSection:'039BC112-E801-4F82-BA21-484F72500736',
   impMsgTimer:null,
+  docNameToken:'',
 
   // mapper
   editTmpl:null, mappings:[],
-  loadingStruct:false, saving:false, savingResult:false,
+  loadingStruct:false, saving:false,
   mAlert:'', mAlertT:'success',
   mSearch:'', mFilt:'all',
   collapsed: new Set(),
   _kidsByParent:{},
   showHint:false,
+  mapperSnapshot:'',
+  _beforeUnloadHandler:null,
 
   // autocomplete
   acTarget:null, acRes:[], acIdx:-1, _acQ:'',
@@ -1020,6 +1077,12 @@ function app() { return {
 
   // ── init ──────────────────────────────────────────────────────
   async init() {
+    this._beforeUnloadHandler = (e) => {
+      if (!this.isMapperDirty()) return;
+      e.preventDefault();
+      e.returnValue = '';
+    };
+    window.addEventListener('beforeunload', this._beforeUnloadHandler);
     if (this.token) { await this.loadMe(); await this.loadTmpls(); }
   },
 
@@ -1038,6 +1101,17 @@ function app() { return {
   async loadMe(){
     try{this.me=await this.req('GET','/admin/auth/me');}
     catch{this.token='';localStorage.removeItem('adm_token');}
+  },
+  async goPage(next){
+    const target=String(next||'').trim();
+    if(!target||target===this.pg) return;
+    if(this.editTmpl){
+      const ok=await this.closeMapper();
+      if(!ok) return;
+    }
+    this.pg=target;
+    if(target==='logs') await this.loadLogs();
+    if(target==='tmpl') await this.loadTmpls();
   },
   logout(){this.token='';localStorage.removeItem('adm_token');},
 
@@ -1086,6 +1160,8 @@ function app() { return {
       bitrix_deal_pdf_multiple:false,
       active:true};
     this.applyResultSettingsDefaults(this.tForm);
+    if(!this.b24Fields.length) await this.loadB24();
+    this.docNameToken='';
     this.tErr=''; this.showTmplModal=true;
   },
   async editT(t){
@@ -1096,6 +1172,8 @@ function app() { return {
     if(!('bitrix_deal_pdf_field' in this.tForm)) this.tForm.bitrix_deal_pdf_field='';
     if(!('bitrix_deal_pdf_multiple' in this.tForm)) this.tForm.bitrix_deal_pdf_multiple=false;
     this.applyResultSettingsDefaults(this.tForm);
+    if(!this.b24Fields.length) await this.loadB24();
+    this.docNameToken='';
     this.tErr=''; this.showTmplModal=true;
   },
   async saveT(){
@@ -1115,7 +1193,7 @@ function app() { return {
 
   // ── mapper ────────────────────────────────────────────────────
   async openMapper(t){
-    this.editTmpl=t; this.mAlert=''; this.mSearch=''; this.mFilt='all';
+    this.editTmpl={...t}; this.mAlert=''; this.mSearch=''; this.mFilt='all';
     this.applyResultSettingsDefaults(this.editTmpl);
     this.collapsed=new Set(); this.acClose();
     this.selectorFieldOptions={};
@@ -1126,10 +1204,49 @@ function app() { return {
     this.autoCollapseGroups();
     this.hydrateSelectorMaps();
     await this.loadB24();
+    this.mapperSnapshot=this.getMapperSnapshot();
   },
-  closeMapper(){this.editTmpl=null;this.loadTmpls();},
+  getMapperSnapshot(){
+    if(!this.editTmpl) return '';
+    const settings={
+      bitrix_result_mode:String(this.editTmpl.bitrix_result_mode||'both'),
+      bitrix_deal_link_field:String(this.editTmpl.bitrix_deal_link_field||''),
+      bitrix_deal_link_multiple:Boolean(this.editTmpl.bitrix_deal_link_multiple),
+      bitrix_deal_pdf_field:String(this.editTmpl.bitrix_deal_pdf_field||''),
+      bitrix_deal_pdf_multiple:Boolean(this.editTmpl.bitrix_deal_pdf_multiple),
+    };
+    const mappings=this.mappings.map(m=>({
+      variable_id:String(m.variable_id||''),
+      source_type:String(m.source_type||'skip'),
+      source_value:String(m.source_value||''),
+    }));
+    return JSON.stringify({settings,mappings});
+  },
+  isMapperDirty(){
+    if(!this.editTmpl) return false;
+    return this.mapperSnapshot!==this.getMapperSnapshot();
+  },
+  markMapperClean(){
+    this.mapperSnapshot=this.getMapperSnapshot();
+  },
+  async closeMapper(force=false){
+    if(this.editTmpl && !force && this.isMapperDirty()){
+      const ok=confirm('Есть несохранённые изменения. Выйти без сохранения?');
+      if(!ok) return false;
+    }
+    this.editTmpl=null;
+    this.mappings=[];
+    this.mapperSnapshot='';
+    this.acClose();
+    await this.loadTmpls();
+    return true;
+  },
 
   async refreshStruct(){
+    if(this.isMapperDirty()){
+      const ok=confirm('Есть несохранённые изменения. Обновление структуры их сбросит. Продолжить?');
+      if(!ok) return;
+    }
     this.loadingStruct=true; this.mAlert='';
     try{
       const r=await this.req('POST',`/admin/templates/${this.editTmpl.id}/refresh-structure`);
@@ -1140,37 +1257,50 @@ function app() { return {
       this.autoCollapseGroups();
       this.selectorFieldOptions={};
       this.hydrateSelectorMaps();
+      this.markMapperClean();
       this.mAlert=`Загружено ${r.count} переменных`; this.mAlertT='success';
     }catch(e){this.mAlert='Ошибка: '+e.message;this.mAlertT='error';}
     finally{this.loadingStruct=false;}
   },
 
-  async saveMappings(){
-    this.saving=true; this.mAlert='';
-    try{
-      const p=this.mappings.map(m=>({variable_id:m.variable_id,source_type:m.source_type,source_value:m.source_value||''}));
-      await this.req('PUT',`/admin/templates/${this.editTmpl.id}/mappings`,p);
-      this.mAlert='Маппинг сохранён ✓'; this.mAlertT='success';
-    }catch(e){this.mAlert='Ошибка: '+e.message;this.mAlertT='error';}
-    finally{this.saving=false;}
-  },
-
-  async saveResultSettings(){
+  async saveAllAndBack(){
     if(!this.editTmpl) return;
-    this.savingResult=true;
-    this.mAlert='';
+    this.saving=true; this.mAlert='';
     try{
       this.applyResultSettingsDefaults(this.editTmpl);
       await this.req('PUT',`/admin/templates/${this.editTmpl.id}`,this.buildTemplatePayload(this.editTmpl));
-      this.mAlert='Настройки сохранения результата обновлены ✓';
-      this.mAlertT='success';
-      await this.loadTmpls();
+      const p=this.mappings.map(m=>({
+        variable_id:m.variable_id,
+        source_type:m.source_type,
+        source_value:m.source_value||'',
+      }));
+      await this.req('PUT',`/admin/templates/${this.editTmpl.id}/mappings`,p);
+      this.markMapperClean();
+      const name=this.editTmpl.name||this.editTmpl.key||`#${this.editTmpl.id}`;
+      this.setImpMsg(`Шаблон «${name}» сохранён ✓`,'success',5000);
+      await this.closeMapper(true);
+      return;
     }catch(e){
-      this.mAlert='Ошибка настроек результата: '+e.message;
+      this.mAlert='Ошибка сохранения: '+e.message;
       this.mAlertT='error';
     }finally{
-      this.savingResult=false;
+      this.saving=false;
     }
+  },
+
+  insertDocNameToken(token=''){
+    const picked=String(token||this.docNameToken||'').trim();
+    if(!picked) return;
+    const cur=String(this.tForm.doc_name_template||'').trim();
+    this.tForm.doc_name_template=cur?`${cur} ${picked}`:picked;
+    this.docNameToken='';
+  },
+
+  get docNameFieldTokens(){
+    if(!Array.isArray(this.b24Fields)) return [];
+    return this.b24Fields
+      .filter(f=>f && ['deal','lead','contact','company'].includes(String(f.entity||'').toLowerCase()))
+      .sort((a,b)=>String(a.label||'').localeCompare(String(b.label||''),'ru'));
   },
 
   toggleG(id){
@@ -1379,6 +1509,23 @@ function app() { return {
     const type=(meta.user_type_id||meta.type||'').toString();
     return `${meta.label} · ${type} · ${many}`;
   },
+  selectorSourceMayHaveOptions(path){
+    const meta=this.selectorSourceMeta(path);
+    if(!meta) return false;
+    const type=String(meta.type||'').trim().toLowerCase();
+    const userType=String(meta.user_type_id||'').trim().toLowerCase();
+    if(['crm_status','enumeration','boolean','select','list'].includes(type)) return true;
+    if(['crm_status','enumeration','boolean'].includes(userType)) return true;
+    return false;
+  },
+  selectorValuePlaceholder(path, operator){
+    const p=String(path||'').trim();
+    if(!p) return this.selRulePlaceholder(operator);
+    if(this.selectorSourceMayHaveOptions(p) && !this.selectorSourceHasOptions(p)){
+      return 'Код/значение из Б24 (список не загружен)';
+    }
+    return this.selRulePlaceholder(operator);
+  },
   selectorValueLabel(path,value){
     const val=String(value||'').trim();
     if(!val) return '';
@@ -1455,12 +1602,23 @@ function app() { return {
   async onSelSourceFieldChange(m){
     const cfg=this.ensureSelMap(m);
     cfg.source_field=String(cfg.source_field||'').trim();
-    await this.ensureSelectorFieldOptions(cfg.source_field);
+    const options=await this.ensureSelectorFieldOptions(cfg.source_field);
+    const allowed=new Set((options||[]).map(o=>String(o.value||'').trim()).filter(Boolean));
+    const hasAllowed=allowed.size>0;
     cfg.rules.forEach(r=>{
       if(this.ruleUsesMultiValue(r.operator)){
         r.values=this._normalizeRuleValues(r.values&&r.values.length?r.values:r.value);
+        if(hasAllowed){
+          r.values=r.values.filter(v=>allowed.has(String(v||'').trim()));
+        }
         if(!r.value && r.values.length) r.value=r.values[0];
+        if(hasAllowed && r.value && !allowed.has(String(r.value||'').trim())){
+          r.value=r.values[0]||'';
+        }
       }else{
+        if(hasAllowed && r.value && !allowed.has(String(r.value||'').trim())){
+          r.value='';
+        }
         if(!r.value && r.values && r.values.length) r.value=r.values[0];
       }
     });

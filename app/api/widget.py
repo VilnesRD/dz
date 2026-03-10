@@ -166,7 +166,9 @@ async def _process_install_payload(params: dict, form: dict) -> None:
         repo.save_oauth_token(db, domain, auth_id, refresh_id or "", expires, member_id)
     logger.info("✅ Токены сохранены для %s", domain)
 
-    widget_url = f"{settings.APP_PUBLIC_URL}/bitrix/widget"
+    app_base = settings.APP_PUBLIC_URL.rstrip("/")
+    widget_url = f"{app_base}/bitrix/widget"
+    icon_url = f"{app_base}/assets/doczilla-logo.png"
     async with httpx.AsyncClient(timeout=15) as client:
         # Сначала удаляем старые привязки этого приложения, чтобы гарантированно
         # обновить handler после переустановки/смены URL.
@@ -206,6 +208,7 @@ async def _process_install_payload(params: dict, form: dict) -> None:
                 "HANDLER": widget_url,
                 "TITLE": "Создать документ в Doczilla",
                 "DESCRIPTION": "Генерация PDF через Doczilla PRO",
+                "ICON": icon_url,
             }
         )
         try:
