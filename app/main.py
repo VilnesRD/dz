@@ -33,6 +33,11 @@ logger = logging.getLogger(__name__)
 settings = get_settings()
 
 STATIC_DIR = Path(__file__).parent / "static"
+NO_CACHE_HEADERS = {
+    "Cache-Control": "no-store, no-cache, must-revalidate, max-age=0",
+    "Pragma": "no-cache",
+    "Expires": "0",
+}
 
 _doczilla_client: DoczillaClient | None = None
 
@@ -115,7 +120,7 @@ async def health():
 @app.get("/admin", response_class=HTMLResponse, include_in_schema=False)
 @app.get("/admin/", response_class=HTMLResponse, include_in_schema=False)
 async def admin_panel():
-    return FileResponse(STATIC_DIR / "admin.html")
+    return FileResponse(STATIC_DIR / "admin.html", headers=NO_CACHE_HEADERS)
 
 
 # ── Ручной запуск для тестов ──────────────────────────────────────────────────
