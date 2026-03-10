@@ -65,6 +65,20 @@ def build_fill_payload(
                 if value is not None:
                     payload[m.variable_id] = value
                     sources["doc"][m.variable_id] = value
+                else:
+                    src_type = str(m.source_type or "").strip()
+                    src_value = str(m.source_value or "").strip()
+                    raw_preview = _build_raw_preview(m, sources)
+                    log.info(
+                        "skip variable id=%s name='%s' kind=%s type=%s source=%s value='%s' raw=%s reason=resolved_none",
+                        m.variable_id,
+                        m.variable_name,
+                        m.variable_kind,
+                        m.variable_type,
+                        src_type,
+                        src_value,
+                        raw_preview,
+                    )
             except Exception as e:
                 log.warning("Маппинг id=%s ('%s'): %s", m.variable_id, m.variable_name, e)
                 # Не прерываем генерацию из-за одного поля
@@ -101,6 +115,37 @@ def _resolve(m: FieldMapping, sources: dict) -> Any:
 
     # Приводим к нужному типу
     return _coerce(raw, m.variable_type, kind)
+
+
+def _build_raw_preview(m: FieldMapping, sources: dict) -> str:
+    """
+    Логовый preview сырого значения до _coerce.
+    """
+    try:
+        src = str(m.source_type or "").strip()
+        val = str(m.source_value or "").strip()
+        if src == "field":
+            raw = _get_field_raw(val, sources)
+        elif src == "formula":
+            raw = _raw_value(src, val, sources)
+        elif src == "literal":
+            raw = val
+        elif src == "selector_map":
+            try:
+                cfg = json.loads(val) if val else {}
+            except Exception:
+                cfg = {}
+            source_field = str(cfg.get("source_field") or "").strip()
+            raw = _get_field_raw(source_field, sources) if source_field else ""
+        else:
+            raw = _raw_value(src, val, sources)
+        text = _stringify_value(raw)
+        text = text.replace("\n", "\\n")
+        if len(text) > 180:
+            text = text[:180] + "..."
+        return text
+    except Exception as e:
+        return f"<preview_error:{e}>"
 
 
 def _raw_value(source_type: str, source_value: str, sources: dict) -> Any:
