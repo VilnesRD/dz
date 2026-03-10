@@ -274,7 +274,8 @@ async def manual_generate(req: GenerateRequest):
         raise HTTPException(503, str(e))
     except Exception as e:
         _safe_update_log(status="error", error_message=str(e))
-        raise
+        logger.exception("Необработанная ошибка /api/generate: %s", e)
+        raise HTTPException(500, f"Внутренняя ошибка генерации: {e}")
     finally:
         if owns_bitrix_client and svc:
             await svc.bitrix.close()

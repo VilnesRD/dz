@@ -56,6 +56,54 @@ class DocumentGenerationService:
         return sum(1 for v in payload.values() if v not in (None, "", [], {}, ()))
 
     @staticmethod
+    def _value_preview(value: object, limit: int = 140) -> str:
+        text = str(value)
+        text = text.replace("\n", "\\n")
+        if len(text) > limit:
+            return text[:limit] + "..."
+        return text
+
+    def _log_fill_payload(self, template, payload: dict[str, object], log_prefix: str) -> None:
+        mappings = list(getattr(template, "mappings", []) or [])
+        by_id = {str(m.variable_id): m for m in mappings}
+        payload_keys = {str(k) for k in payload.keys()}
+
+        logger.info("%s: fill payload details START (vars=%d)", log_prefix, len(payload))
+        for var_id, value in payload.items():
+            key = str(var_id)
+            m = by_id.get(key)
+            if m is None:
+                logger.info(
+                    "%s: fill var id=%s value=%s",
+                    log_prefix, key, self._value_preview(value),
+                )
+                continue
+            logger.info(
+                "%s: fill var id=%s name='%s' kind=%s type=%s source=%s -> %s",
+                log_prefix,
+                key,
+                str(m.variable_name or "").strip(),
+                str(m.variable_kind or "").strip(),
+                str(m.variable_type or "").strip(),
+                str(m.source_type or "").strip(),
+                self._value_preview(value),
+            )
+
+        skipped = []
+        for m in mappings:
+            if str(m.source_type or "").strip().lower() == "skip":
+                continue
+            mid = str(m.variable_id)
+            if mid not in payload_keys:
+                skipped.append(f"{mid}:{str(m.variable_name or '').strip()}")
+        if skipped:
+            preview = ", ".join(skipped[:30])
+            if len(skipped) > 30:
+                preview += f" ... (+{len(skipped) - 30})"
+            logger.info("%s: skipped vars (%d): %s", log_prefix, len(skipped), preview)
+        logger.info("%s: fill payload details END", log_prefix)
+
+    @staticmethod
     def _build_doc_link(doc_id: str, doc_link_code: str) -> str:
         base = settings.DOCZILLA_BASE_URL.rstrip("/")
         if doc_link_code:
@@ -138,6 +186,7 @@ class DocumentGenerationService:
         warnings: list[str] = []
         non_empty = self._count_non_empty_payload(payload)
         logger.info("deal=%s: payload %d переменных (непустых=%d)", deal_id, len(payload), non_empty)
+        self._log_fill_payload(template, payload, f"deal={deal_id}")
 
         # ── 4. Создать и заполнить документ в Doczilla ────────────────────────
         doc_id, doc_link = await self._create_and_fill_doc(
@@ -240,6 +289,7 @@ class DocumentGenerationService:
         warnings: list[str] = []
         non_empty = self._count_non_empty_payload(payload)
         logger.info("lead=%s: payload %d переменных (непустых=%d)", lead_id, len(payload), non_empty)
+        self._log_fill_payload(template, payload, f"lead={lead_id}")
 
         doc_id, doc_link = await self._create_and_fill_doc(
             template=template,
@@ -283,6 +333,7 @@ class DocumentGenerationService:
         warnings: list[str] = []
         non_empty = self._count_non_empty_payload(payload)
         logger.info("contact=%s: payload %d переменных (непустых=%d)", contact_id, len(payload), non_empty)
+        self._log_fill_payload(template, payload, f"contact={contact_id}")
 
         doc_id, doc_link = await self._create_and_fill_doc(
             template=template,
@@ -315,6 +366,7 @@ class DocumentGenerationService:
         warnings: list[str] = []
         non_empty = self._count_non_empty_payload(payload)
         logger.info("company=%s: payload %d переменных (непустых=%d)", company_id, len(payload), non_empty)
+        self._log_fill_payload(template, payload, f"company={company_id}")
 
         doc_id, doc_link = await self._create_and_fill_doc(
             template=template,

@@ -314,16 +314,26 @@ class DoczillaClient:
         variables: {"ИмяПеременной": "значение", ...}
         """
         import json
-        await self._request({
+        keys = [str(k) for k in variables.keys()]
+        keys_preview = ", ".join(keys[:40])
+        if len(keys) > 40:
+            keys_preview += f" ... (+{len(keys) - 40})"
+        logger.info("Doczilla fillDocz: doc_id=%s vars=%d keys=[%s]", doc_id, len(keys), keys_preview)
+
+        data_payload = json.dumps(variables, ensure_ascii=False)
+        logger.debug("Doczilla fillDocz raw payload doc_id=%s: %s", doc_id, data_payload[:8000])
+
+        response = await self._request({
             "request": "pro.doczilla.gpt.workspace.table.Workspace",
             "action": "content",
             "method": "fillDocz",
-            "data": json.dumps(variables, ensure_ascii=False),
+            "data": data_payload,
             # В разных версиях API встречаются оба варианта параметра.
             "id": doc_id,
             "file": doc_id,
         })
-        logger.debug("Doczilla fillDocz: заполнено %d переменных для %s", len(variables), doc_id)
+        messages = response.get("info", {}).get("messages", []) if isinstance(response, dict) else []
+        logger.info("Doczilla fillDocz: success doc_id=%s vars=%d messages=%s", doc_id, len(keys), messages)
 
     async def get_document_pdf(self, doc_id: str) -> bytes:
         """
