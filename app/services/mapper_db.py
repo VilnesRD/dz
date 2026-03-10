@@ -36,6 +36,7 @@ def build_fill_payload(
     contact: dict | None,
     company: dict | None,
     lead: dict | None = None,
+    diagnostics: list[dict[str, str]] | None = None,
 ) -> dict[str, Any]:
     """
     Построить payload для fillDocz на основе маппингов из БД.
@@ -79,6 +80,17 @@ def build_fill_payload(
                         src_value,
                         raw_preview,
                     )
+                    if diagnostics is not None:
+                        diagnostics.append({
+                            "variable_id": str(m.variable_id),
+                            "variable_name": str(m.variable_name or "").strip(),
+                            "variable_kind": str(m.variable_kind or "").strip(),
+                            "variable_type": str(m.variable_type or "").strip(),
+                            "source_type": src_type,
+                            "source_value": src_value,
+                            "raw_preview": raw_preview,
+                            "reason": "resolved_none",
+                        })
             except Exception as e:
                 log.warning("Маппинг id=%s ('%s'): %s", m.variable_id, m.variable_name, e)
                 # Не прерываем генерацию из-за одного поля

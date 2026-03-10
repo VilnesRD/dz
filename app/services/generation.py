@@ -16,6 +16,7 @@
 import logging
 from dataclasses import dataclass
 import re
+import json
 
 from app.services.bitrix_client import BitrixClient
 from app.services.doczilla_client import DoczillaClient
@@ -104,6 +105,64 @@ class DocumentGenerationService:
         logger.info("%s: fill payload details END", log_prefix)
 
     @staticmethod
+    def _humanize_source_path(path: str) -> str:
+        text = str(path or "").strip()
+        if not text:
+            return "источник не указан"
+        if "." not in text:
+            return text
+        source, field = text.split(".", 1)
+        source_labels = {
+            "deal": "Сделка",
+            "lead": "Лид",
+            "contact": "Контакт",
+            "company": "Компания",
+            "doc": "Документ",
+        }
+        return f"{source_labels.get(source, source)}: {field}"
+
+    def _build_empty_source_warnings(self, diagnostics: list[dict[str, str]]) -> list[str]:
+        if not diagnostics:
+            return []
+        warnings: list[str] = []
+        for item in diagnostics:
+            source_type = str(item.get("source_type") or "").strip().lower()
+            if source_type not in {"field", "formula", "selector_map"}:
+                continue
+
+            var_name = str(item.get("variable_name") or "").strip() or f"id={item.get('variable_id')}"
+            source_value = str(item.get("source_value") or "").strip()
+            source_title = source_value
+            if source_type == "selector_map":
+                # selector_map хранит JSON, показываем source_field из конфига.
+                try:
+                    cfg = json.loads(source_value) if source_value else {}
+                except Exception:
+                    cfg = {}
+                source_title = str(cfg.get("source_field") or "").strip() or source_value
+
+            if source_type == "formula":
+                source_desc = "формула"
+            else:
+                source_desc = self._humanize_source_path(source_title)
+
+            warnings.append(f"Пустой источник для «{var_name}»: {source_desc}")
+
+        # Дедупликация + ограничение размера ответа.
+        uniq: list[str] = []
+        seen = set()
+        for w in warnings:
+            if w in seen:
+                continue
+            seen.add(w)
+            uniq.append(w)
+        limit = 10
+        if len(uniq) > limit:
+            extra = len(uniq) - limit
+            return uniq[:limit] + [f"И ещё {extra} пустых полей по маппингу."]
+        return uniq
+
+    @staticmethod
     def _build_doc_link(doc_id: str, doc_link_code: str) -> str:
         base = settings.DOCZILLA_BASE_URL.rstrip("/")
         if doc_link_code:
@@ -181,9 +240,10 @@ class DocumentGenerationService:
                 logger.warning("deal=%s: не удалось загрузить компанию: %s", deal_id, e)
 
         # ── 3. Маппинг полей ──────────────────────────────────────────────────
-        payload = build_fill_payload(template, deal, contact, company, lead=None)
+        diagnostics: list[dict[str, str]] = []
+        payload = build_fill_payload(template, deal, contact, company, lead=None, diagnostics=diagnostics)
         doc_name = build_doc_name(template, deal)
-        warnings: list[str] = []
+        warnings: list[str] = self._build_empty_source_warnings(diagnostics)
         non_empty = self._count_non_empty_payload(payload)
         logger.info("deal=%s: payload %d переменных (непустых=%d)", deal_id, len(payload), non_empty)
         self._log_fill_payload(template, payload, f"deal={deal_id}")
@@ -284,9 +344,10 @@ class DocumentGenerationService:
             except Exception as e:
                 logger.warning("lead=%s: не удалось загрузить компанию: %s", lead_id, e)
 
-        payload = build_fill_payload(template, deal={}, contact=contact, company=company, lead=lead)
+        diagnostics: list[dict[str, str]] = []
+        payload = build_fill_payload(template, deal={}, contact=contact, company=company, lead=lead, diagnostics=diagnostics)
         doc_name = build_doc_name(template, lead)
-        warnings: list[str] = []
+        warnings: list[str] = self._build_empty_source_warnings(diagnostics)
         non_empty = self._count_non_empty_payload(payload)
         logger.info("lead=%s: payload %d переменных (непустых=%d)", lead_id, len(payload), non_empty)
         self._log_fill_payload(template, payload, f"lead={lead_id}")
@@ -328,9 +389,10 @@ class DocumentGenerationService:
             except Exception as e:
                 logger.warning("contact=%s: не удалось загрузить компанию: %s", contact_id, e)
 
-        payload = build_fill_payload(template, deal={}, contact=contact, company=company, lead=None)
+        diagnostics: list[dict[str, str]] = []
+        payload = build_fill_payload(template, deal={}, contact=contact, company=company, lead=None, diagnostics=diagnostics)
         doc_name = build_doc_name(template, contact)
-        warnings: list[str] = []
+        warnings: list[str] = self._build_empty_source_warnings(diagnostics)
         non_empty = self._count_non_empty_payload(payload)
         logger.info("contact=%s: payload %d переменных (непустых=%d)", contact_id, len(payload), non_empty)
         self._log_fill_payload(template, payload, f"contact={contact_id}")
@@ -361,9 +423,10 @@ class DocumentGenerationService:
         logger.info("company=%s шаблон=%s: получаем данные из Б24", company_id, template_key)
         company = await self.bitrix.get_company(company_id)
 
-        payload = build_fill_payload(template, deal={}, contact=None, company=company, lead=None)
+        diagnostics: list[dict[str, str]] = []
+        payload = build_fill_payload(template, deal={}, contact=None, company=company, lead=None, diagnostics=diagnostics)
         doc_name = build_doc_name(template, company)
-        warnings: list[str] = []
+        warnings: list[str] = self._build_empty_source_warnings(diagnostics)
         non_empty = self._count_non_empty_payload(payload)
         logger.info("company=%s: payload %d переменных (непустых=%d)", company_id, len(payload), non_empty)
         self._log_fill_payload(template, payload, f"company={company_id}")
